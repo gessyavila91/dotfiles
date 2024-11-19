@@ -56,3 +56,26 @@ yabai -m signal --add event=window_focused action="sketchybar --trigger window_f
 yabai -m signal --add event=window_title_changed action="sketchybar --trigger title_change &> /dev/null"
 
 echo "yabai configuration loaded.."
+
+# disable specific apps
+yabai -m rule --add app="^System Settings$" manage=off
+yabai -m rule --add app="^Calculator$" manage=off
+yabai -m rule --add app="^Karabiner-Elements$" manage=off
+yabai -m rule --add app="^Karabiner-EventViewer$" manage=off
+yabai -m rule --add app="^QuickTime Player$" manage=off
+yabai -m rule --add app="^Python$" manage=off
+yabai -m rule --add app="^iScreen Shoter$" manage=off
+yabai -m rule --add app="^Easy CSV Editor$" manage=off
+yabai -m rule --add app="^AnyDesk$" manage=off
+yabai -m rule --add app="^LINE$" manage=off
+yabai -m rule --add app="^VNC Viewer$" manage=off
+yabai -m rule --add app="^Mousecape$" manage=off
+yabai -m rule --add app="^Raycast$" manage=off
+yabai -m rule --add app="^TapRecord$" manage=off
+yabai -m rule --add title="Figure 1" manage=off
+yabai -m rule --add title="Figure 2" manage=off
+yabai -m rule --add title="Figure 3" manage=off
+yabai -m rule --add title="Figure 4" manage=off
+yabai -m rule --add title="Figure 5" manage=off
+yabai -m rule --add title="Subplot configuration tool" manage=off
+# borders active_color=0xffe1e3e4 enactive_color=0xff494d64 width=5.0 &
