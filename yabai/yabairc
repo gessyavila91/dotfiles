@@ -1,81 +1,90 @@
 #!/usr/bin/env sh
 
-#
-# for this to work you must configure sudo such that
-# it will be able to run the command without password
-#
-# see this wiki page for information:
-#  - https://github.com/koekeishiya/yabai/wiki/Installing-yabai-(latest-release)#configure-scripting-addition
-#
-yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+# Load Yabai scripting addition
 sudo yabai --load-sa
-#
-# find all executable files in ~/.config/yabai and execute them
-# find "${HOME}/.config/yabai" -type f -perm +111 -exec {} \;
+yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
 
-# global settings
-yabai -m config                                 \
-    external_bar                 off:40:0       \
-    menubar_opacity              1.0            \
-    mouse_follows_focus          off            \
-    focus_follows_mouse          off            \
-    display_arrangement_order    default        \
-    window_origin_display        default        \
-    window_placement             second_child   \
-    window_zoom_persist          on             \
-    window_shadow                on             \
-    window_animation_easing      ease_out_circ  \
-    window_opacity_duration      0.0            \
-    active_window_opacity        1.0            \
-    normal_window_opacity        0.90           \
-    window_opacity               off            \
-    insert_feedback_color        0xffbd93f9     \
-    split_ratio                  0.50           \
-    split_type                   auto           \
-    auto_balance                 off            \
-    top_padding                  06             \
-    bottom_padding               06             \
-    left_padding                 06             \
-    right_padding                06             \
-    window_gap                   02             \
-    layout                       bsp            \
-    mouse_modifier               fn             \
-    mouse_action1                move           \
-    mouse_action2                resize         \
-    mouse_drop_action            swap
+# Function to apply Yabai configuration settings
+apply_yabai_config() {
+  local yabai_config=(
+    -m config
 
-# add 20 padding to the top and bottom of all spaces regardless of the display it belongs to
-yabai -m config external_bar all:30:0
+    layout bsp
+    auto_balance off
+    split_ratio 0.50
 
-yabai -m rule --add app="^System Settings$" manage=off
-yabai -m rule --add app="^Calculator$" manage=off
-yabai -m rule --add app="^Karabiner-Elements$" manage=off
+    insert_feedback_color 0xffbd93f9
 
-# S K E T C H Y B A R  E V E N T S
-yabai -m signal --add event=window_focused action="sketchybar --trigger window_focus &> /dev/null"
-yabai -m signal --add event=window_title_changed action="sketchybar --trigger title_change &> /dev/null"
+    focus_follows_mouse off
+    mouse_follows_focus on
+    mouse_modifier ctrl
+    mouse_action1 move
+    mouse_action2 resize
+    mouse_drop_action swap
 
+    top_padding 8
+    bottom_padding 8
+    left_padding 8
+    right_padding 9
+    window_gap 8
+    external_bar all:36:0
+
+    active_window_opacity 0.95
+    normal_window_opacity 0.8
+
+    window_placement second_child
+    window_shadow float
+    window_opacity on
+    window_opacity_duration 0.2
+
+    window_zoom_persist off
+    window_animation_duration 0.3
+    window_animation_easing ease_out_quint
+  )
+
+  yabai "${yabai_config[@]}"
+}
+
+# Function to add application-specific rules
+add_yabai_rules() {
+  # Exclude specific applications from being opacified
+  yabai -m rule --add app="^Arc$" opacity=1.0
+  yabai -m rule --add app="^Zen Browser$" opacity=1.0
+  yabai -m rule --add app="^Figma$" opacity=1.0
+
+  # Exclude specific windows by title
+  # yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info|Pref)" manage=off
+  # yabai -m rule --add label="Safari" app="^Safari$" title="^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$" manage=off
+  # yabai -m rule --add label="About This Mac" app="System Information" title="About This Mac" manage=off
+  # yabai -m rule --add label="Select file to save to" app="^Inkscape$" title="Select file to save to" manage=off
+
+  # yabai -m rule --add label="PhpStorm" app="^Php Storm$" title="(Welcome to PhpStorm|Settings)" manage=off
+
+  # Exclude specific applications from being managed
+   apps_to_exclude=(
+     "^Calculator$"
+     "^Software Update$"
+     "^Dictionary$"
+     "^System Preferences$"
+     "^System Settings$"
+     "^Archive Utility$"
+     "^App Store$"
+     "^Raycast$"
+     "^Activity Monitor$"
+     "^Notion Calendar$"
+     "^Tuple$"
+     "^Messages$"
+     "^Logi Options+$"
+     "^Mail$"
+   )
+
+   for app in "${apps_to_exclude[@]}"; do
+     yabai -m rule --add app="$app" manage=off
+   done
+}
+
+# Apply configuration and rules
+apply_yabai_config
+add_yabai_rules
+borders active_color=0xffbd93f9 inactive_color=0xfff8f8f2 width=4.0 &
 echo "yabai configuration loaded.."
-
-# disable specific apps
-yabai -m rule --add app="^System Settings$" manage=off
-yabai -m rule --add app="^Calculator$" manage=off
-yabai -m rule --add app="^Karabiner-Elements$" manage=off
-yabai -m rule --add app="^Karabiner-EventViewer$" manage=off
-yabai -m rule --add app="^QuickTime Player$" manage=off
-yabai -m rule --add app="^Python$" manage=off
-yabai -m rule --add app="^iScreen Shoter$" manage=off
-yabai -m rule --add app="^Easy CSV Editor$" manage=off
-yabai -m rule --add app="^AnyDesk$" manage=off
-yabai -m rule --add app="^LINE$" manage=off
-yabai -m rule --add app="^VNC Viewer$" manage=off
-yabai -m rule --add app="^Mousecape$" manage=off
-yabai -m rule --add app="^Raycast$" manage=off
-yabai -m rule --add app="^TapRecord$" manage=off
-yabai -m rule --add title="Figure 1" manage=off
-yabai -m rule --add title="Figure 2" manage=off
-yabai -m rule --add title="Figure 3" manage=off
-yabai -m rule --add title="Figure 4" manage=off
-yabai -m rule --add title="Figure 5" manage=off
-yabai -m rule --add title="Subplot configuration tool" manage=off
-# borders active_color=0xffe1e3e4 enactive_color=0xff494d64 width=5.0 &

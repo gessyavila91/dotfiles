@@ -3,51 +3,53 @@ local colors = require("colors")
 
 -- Equivalent to the --default domain
 sbar.default({
-	update_freq = 1,
-	icon = {
-		font = {
-			family = settings.font.text,
-			style = settings.font.style_map["Bold"],
-			size = 16.0,
-		},
-		color = colors.yellow,
-		highlight = colors.background,
-		padding_left = 6,
-		padding_right = 2,
-		corner_radius = 6,
-		background = { image = { corner_radius = 12 } },
-	},
-	label = {
-		font = {
-			family = settings.font.text,
-			style = settings.font.style_map["Semibold"],
-			size = 13.0,
-		},
-		color = colors.yellow,
-		highlight = colors.background,
-		padding_left = settings.paddings,
-		padding_right = settings.paddings,
-	},
-	background = {
-		height = 34,
-		corner_radius = 10,
-		border_width = 2,
-		border_color = colors.yellow,
-		image = {
-			corner_radius = 0,
-		},
-	},
-	popup = {
-		background = {
-			border_width = 2,
-			corner_radius = 12,
-			border_color = colors.popup.border,
-			color = colors.popup.bg,
-			shadow = { drawing = true },
-		},
-		blur_radius = 50,
-	},
-	padding_left = 8,
-	padding_right = 8,
-	-- scroll_texts = true,
+  updates = "when_shown",
+  icon = {
+    font = {
+      family = settings.font.icons,
+      style = settings.font.style_map["Regular"],
+      size = settings.font.sizes.icons
+    },
+    color = colors.white,
+    padding_left = settings.paddings,
+    padding_right = settings.paddings,
+    background = { image = { corner_radius = settings.item_corner_radius } },
+  },
+  label = {
+    font = {
+      family = settings.font.text,
+      style = settings.font.style_map["Medium"],
+      size = settings.font.sizes.text
+    },
+    color = colors.white,
+    padding_left = settings.paddings,
+    padding_right = settings.paddings,
+  },
+  background = {
+    height = settings.item_height,
+    corner_radius = settings.item_corner_radius,
+    border_width = 0,
+    image = {
+      corner_radius = settings.item_corner_radius,
+    }
+  },
+  -- TODO: Add a popup menu styles
+  popup = {
+    background = {
+      drawing = true,
+      corner_radius = settings.bar_corner_radius,
+      color = colors.popup.bg,
+      shadow = { drawing = true },
+      image = {
+        corner_radius = settings.bar_corner_radius,
+        padding_left = settings.popup_image_padding,
+        padding_right = settings.popup_image_padding,
+      }
+    },
+    blur_radius = settings.popup_blur_radius,
+    y_offset = settings.popup_y_offset,
+  },
+  padding_left = settings.paddings,
+  padding_right = settings.paddings,
+  scroll_texts = true,
 })
