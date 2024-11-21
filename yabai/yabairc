@@ -35,10 +35,10 @@ apply_yabai_config() {
     window_placement second_child
     window_shadow float
     window_opacity on
-    window_opacity_duration 0.2
+    window_opacity_duration 0.1
 
     window_zoom_persist off
-    window_animation_duration 0.3
+    window_animation_duration 0.1
     window_animation_easing ease_out_quint
   )
 
@@ -64,6 +64,7 @@ add_yabai_rules() {
    apps_to_exclude=(
      "^Calculator$"
      "^Software Update$"
+     "^Spotify$"
      "^Dictionary$"
      "^System Preferences$"
      "^System Settings$"
