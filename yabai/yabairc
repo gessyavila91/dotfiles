@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 
 # Load Yabai scripting addition
-# sudo yabai --load-sa
-# yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+sudo yabai --load-sa
+yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
 
 # Function to apply Yabai configuration settings
 apply_yabai_config() {
@@ -29,9 +29,9 @@ apply_yabai_config() {
     external_bar all:36:0
 
     window_opacity on
-    #window_opacity_duration 0.2
+    window_opacity_duration 0.5
     active_window_opacity 0.95
-    normal_window_opacity 0.8
+    normal_window_opacity 0.80
 
     window_placement second_child
     window_shadow on
@@ -56,9 +56,13 @@ add_yabai_rules() {
   # yabai -m rule --add label="About This Mac" app="System Information" title="About This Mac" manage=off
   # yabai -m rule --add label="Select file to save to" app="^Inkscape$" title="Select file to save to" manage=off
 
-  # fin windows with yabai -m query --windows | jq
+  # find windows with yabai -m query --windows | jq
   # custom rules for PhpStorm
-  yabai -m rule --add app="PhpStorm" title="^(Data Sources and Drivers|Welcome to PhpStorm|Tip of the Day|Settings|Run/Debug Configurations)" manage=off
+  yabai_jetbrains_titles="^(Data Sources and Drivers|Welcome to.*|Tip of the Day|Settings|Run\/Debug Configurations|Push Commits to.*)$"
+  yabai -m rule --add app="PhpStorm" title=yabai_jetbrains_titles manage=off
+  yabai -m rule --add app="CLion" title=yabai_jetbrains_titles manage=off
+
+  yabai -m rule --add app="CLion" title="Copy" manage=off
 
   # realte apps to spaces
   yabai -m rule --add app="Spotify" space=3
