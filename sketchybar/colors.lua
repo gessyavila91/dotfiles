@@ -18,7 +18,7 @@ return {
   -- Line_Highlight=0xff44475a
 
   bar = {
-    bg = 0xe621202e,
+    bg = 0x6621202e,
     border = 0xff29263c,
   },
   popup = {
@@ -26,7 +26,7 @@ return {
     border = 0xff6d6d6d
   },
   spaces = {
-    active = 0xff3d375e,
+    active = 0x3329263c,
     inactive = 0x0029263c
   },
   bg1 = 0xff15141b,
