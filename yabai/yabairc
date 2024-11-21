@@ -56,8 +56,12 @@ add_yabai_rules() {
   # yabai -m rule --add label="About This Mac" app="System Information" title="About This Mac" manage=off
   # yabai -m rule --add label="Select file to save to" app="^Inkscape$" title="Select file to save to" manage=off
 
-  # yabai -m rule --add label="PhpStorm" app="^Php Storm$" title="(Welcome to PhpStorm|Settings)" manage=off
+  # fin windows with yabai -m query --windows | jq
+  # custom rules for PhpStorm
+  yabai -m rule --add app="PhpStorm" title="^(Data Sources and Drivers|Welcome to PhpStorm|Tip of the Day|Settings|Run/Debug Configurations)" manage=off
 
+  # realte apps to spaces
+  yabai -m rule --add app="Spotify" space=3
   # Exclude specific applications from being managed
    apps_to_exclude=(
      "^Calculator$"

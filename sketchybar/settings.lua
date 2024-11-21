@@ -23,7 +23,7 @@ return {
   paddings = 0,
 
   icons = "sf-symbols",   -- Options: "sf-symbols", "nerdfont"
-  animated_icons = false, -- Set to true if you want to use animated icons
+  animated_icons = true, -- Set to true if you want to use animated icons
 
   font = {
       text = "JetBrainsMono Nerd Font",    -- Used for text
