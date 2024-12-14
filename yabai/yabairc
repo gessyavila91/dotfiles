@@ -21,16 +21,16 @@ apply_yabai_config() {
     mouse_action2 resize
     mouse_drop_action swap
 
-    top_padding 8
-    bottom_padding 8
-    left_padding 8
-    right_padding 8
-    window_gap 8
+    top_padding 10
+    bottom_padding 10
+    left_padding 10
+    right_padding 10
+    window_gap 10
     external_bar all:36:0
 
     window_opacity on
     window_opacity_duration 0.5
-    active_window_opacity 0.95
+    active_window_opacity 0.98
     normal_window_opacity 0.80
 
     window_placement second_child
@@ -51,26 +51,48 @@ add_yabai_rules() {
   # yabai -m rule --add app="^Figma$" opacity=1.0
 
   # Exclude specific windows by title
-  # yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info|Pref)" manage=off
-  # yabai -m rule --add label="Safari" app="^Safari$" title="^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$" manage=off
-  # yabai -m rule --add label="About This Mac" app="System Information" title="About This Mac" manage=off
-  # yabai -m rule --add label="Select file to save to" app="^Inkscape$" title="Select file to save to" manage=off
-
   # find windows with yabai -m query --windows | jq
-  # custom rules for PhpStorm
-  yabai_jetbrains_titles="^(Data Sources and Drivers|Welcome to.*|Tip of the Day|Settings|Run\/Debug Configurations|Push Commits to.*)$"
-  yabai -m rule --add app="PhpStorm" title=yabai_jetbrains_titles manage=off
-  yabai -m rule --add app="CLion" title=yabai_jetbrains_titles manage=off
+  # custom rules for Jetbrains Software
+  jetbrains_exclude_titles=(
+    "^Data Sources and Drivers$"
+    "^Welcome to.*$"
+    "^NPM Script$"
+    "^Keymap$"
+    "^Tip of the Day$"
+    "^Settings$"
+    "^Run\/Debug Configurations$"
+    "^Push Commits to.*$"
+    "^Add File to Git$"
+    "^Copy$"
+    "^Rename$"
+    "^Composer$"
+    "^Delete$"
+  )
+  for app_tittle in "${jetbrains_exclude_titles[@]}"; do
+    yabai -m rule --add app="PhpStorm" title="$app_tittle" manage=off
+    yabai -m rule --add app="CLion" title="$app_tittle" manage=off
+  done
 
-  yabai -m rule --add app="CLion" title="Copy" manage=off
+  yabai -m rule --add label="Safari" app="^Safari$" title="^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$" manage=off
 
-  # realte apps to spaces
-  yabai -m rule --add app="Spotify" space=3
+  yabai -m rule --add app="Brave Browser" title="^Acceso:.*$" manage=off
+  yabai -m rule --add label="Brave Browser" app="^Brave Browser$" title="^Acceso:.*$" manage=off
+
+  yabai -m rule --add app="Spotify" title="^Spotify Premium$" manage=off
+  yabai -m rule --add label="Spotify" app="^Spotify$" title="Spotify Premium" manage=off
+
+  yabai -m rule --add app="Finder" title="^Copy$" manage=off
+  yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info|Pref)" manage=off
+
+  yabai -m rule --add label="About This Mac" app="System Information" title="About This Mac" manage=off
+  # relate apps to spaces
+  # yabai -m rule --add app="Spotify" space=3
   # Exclude specific applications from being managed
    apps_to_exclude=(
      "^Calculator$"
      "^Software Update$"
      "^Spotify$"
+     "^Reminders$"
      "^Dictionary$"
      "^System Preferences$"
      "^System Settings$"
@@ -82,6 +104,8 @@ add_yabai_rules() {
      "^Tuple$"
      "^Messages$"
      "^Logi Options+$"
+     "^Logi Options+ Installer$"
+     "^Docker Desktop$"
      "^Mail$"
    )
 
