@@ -16,3 +16,9 @@ alias cat='bat --style=numbers,changes'
 
 # Copy actual path to clipboard
 alias cpydir='pwd | pbcopy && echo "The current directory path has been copied to the clipboard."'
+
+# lazy yabairc reload
+alias yabairld='source ~/.config/yabai/yabairc'
+
+# Laravel/Sail alias
+alias sail='sh $([ -f sail ] && echo sail || echo vendor/bin/sail)'
