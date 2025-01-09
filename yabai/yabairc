@@ -26,8 +26,7 @@ apply_yabai_config() {
     left_padding 10
     right_padding 10
     window_gap 10
-    external_bar all:36:0
-
+    external_bar all:36:3
     window_opacity on
     window_opacity_duration 0.5
     active_window_opacity 0.98
@@ -54,19 +53,30 @@ add_yabai_rules() {
   # find windows with yabai -m query --windows | jq
   # custom rules for Jetbrains Software
   jetbrains_exclude_titles=(
-    "^Data Sources and Drivers$"
-    "^Welcome to.*$"
-    "^NPM Script$"
-    "^Keymap$"
-    "^Tip of the Day$"
-    "^Settings$"
-    "^Run\/Debug Configurations$"
-    "^Push Commits to.*$"
     "^Add File to Git$"
-    "^Copy$"
-    "^Rename$"
+    "^CLI Interpreters$"
+    "^Choose Properties$"
     "^Composer$"
+    "^Copy$"
+    "^Create New PHP File.*$"
+    "^Data Sources and Drivers$"
     "^Delete$"
+    "^Edit Configuration$"
+    "^Go to Line$"
+    "^Keyboard Shortcut$"
+    "^Keymap$"
+    "^Move$"
+    "^New.*$"
+    "^NPM Script$"
+    "^Non-Project Files Protection$"
+    "^Push Commits to.*$"
+    "^Rename$"
+    "^Replace Fragment$"
+    "^Run\/Debug Configurations$"
+    "^Select Classes To Import$"
+    "^Settings$"
+    "^Tip of the Day$"
+    "^Welcome to.*$"
   )
   for app_tittle in "${jetbrains_exclude_titles[@]}"; do
     yabai -m rule --add app="PhpStorm" title="$app_tittle" manage=off
@@ -89,24 +99,24 @@ add_yabai_rules() {
   # yabai -m rule --add app="Spotify" space=3
   # Exclude specific applications from being managed
    apps_to_exclude=(
+     "^Activity Monitor$"
+     "^App Store$"
+     "^Archive Utility$"
      "^Calculator$"
+     "^Dictionary$"
+     "^Docker Desktop$"
+     "^Logi Options+ Installer$"
+     "^Logi Options+$"
+     "^Mail$"
+     "^Messages$"
+     "^Notion Calendar$"
+     "^Raycast$"
+     "^Reminders$"
      "^Software Update$"
      "^Spotify$"
-     "^Reminders$"
-     "^Dictionary$"
      "^System Preferences$"
      "^System Settings$"
-     "^Archive Utility$"
-     "^App Store$"
-     "^Raycast$"
-     "^Activity Monitor$"
-     "^Notion Calendar$"
      "^Tuple$"
-     "^Messages$"
-     "^Logi Options+$"
-     "^Logi Options+ Installer$"
-     "^Docker Desktop$"
-     "^Mail$"
    )
 
    for app in "${apps_to_exclude[@]}"; do
