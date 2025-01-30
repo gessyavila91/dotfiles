@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # Cargar Oh My Posh con el tema personalizado
-eval "$(oh-my-posh init zsh --config /opt/homebrew/opt/oh-my-posh/themes/gessyXdracula.omp.json)"
+eval "$(oh-my-posh init zsh --config /Users/gessyavila/.config/oh-my-posh/themes/gessyXdracula.omp.json)"
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 source ~/.config/zsh/aliases.zsh
