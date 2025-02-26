@@ -1,3 +1,6 @@
+# lazy zshrc reload
+alias zshrld='source ~/.zshrc'
+
 # Crear cdtree para ejecutar tree después de cambiar de directorio
 alias cdtree='builtin cd "$@" && lsd --tree --depth 2'
 
@@ -7,6 +10,7 @@ alias home="cd ~ && lsd"
 alias ls='lsd'
 alias la='ls -a'
 alias lsl='ls -l'
+alias lsi='ls -ia'
 
 # Alias para mostrar dos niveles de profundidad como un árbol
 alias lstree='tree -L 2'

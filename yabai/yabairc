@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# Yabai v7.1.5
 
 # Load Yabai scripting addition
 sudo yabai --load-sa
@@ -54,6 +55,7 @@ add_yabai_rules() {
   # custom rules for Jetbrains Software
   jetbrains_exclude_titles=(
     "^Add File to Git$"
+    "^Available Packages$"
     "^CLI Interpreters$"
     "^Choose Properties$"
     "^Composer$"
@@ -69,9 +71,11 @@ add_yabai_rules() {
     "^New.*$"
     "^NPM Script$"
     "^Non-Project Files Protection$"
+    "^PHP$"
     "^Push Commits to.*$"
     "^Rename$"
     "^Replace Fragment$"
+    "^Rollback Changes$"
     "^Run\/Debug Configurations$"
     "^Select Classes To Import$"
     "^Settings$"
@@ -81,12 +85,33 @@ add_yabai_rules() {
   for app_tittle in "${jetbrains_exclude_titles[@]}"; do
     yabai -m rule --add app="PhpStorm" title="$app_tittle" manage=off
     yabai -m rule --add app="CLion" title="$app_tittle" manage=off
+    yabai -m rule --add app="PyCharm" title="$app_tittle" manage=off
   done
 
-  yabai -m rule --add label="Safari" app="^Safari$" title="^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$" manage=off
+  # Exclude specific windows by title
+  # find windows with yabai -m query --windows | jq
+  # custom rules for Browsers
+  browser_exclude_titles=(
+    "^Add File to Git$"
+    "^PayPal Checkout - Brave$"
+    "^Welcome to.*$"
+    "^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$"
+  )
+  for app_tittle in "${browser_exclude_titles[@]}"; do
+    yabai -m rule --add app="Brave Browser" title="$app_tittle" manage=off
+    yabai -m rule --add app="Safari" title="$app_tittle" manage=off
+  done
 
-  yabai -m rule --add app="Brave Browser" title="^Acceso:.*$" manage=off
-  yabai -m rule --add label="Brave Browser" app="^Brave Browser$" title="^Acceso:.*$" manage=off
+  browser_exclude_titles=(
+    "^Add File to Git$"
+    "^PayPal Checkout - Brave$"
+    "^Welcome to.*$"
+    "^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$"
+  )
+  for app_tittle in "${browser_exclude_titles[@]}"; do
+    yabai -m rule --add app="Brave Browser" title="$app_tittle" manage=off
+    yabai -m rule --add app="Safari" title="$app_tittle" manage=off
+  done
 
   yabai -m rule --add app="Spotify" title="^Spotify Premium$" manage=off
   yabai -m rule --add label="Spotify" app="^Spotify$" title="Spotify Premium" manage=off
@@ -99,6 +124,12 @@ add_yabai_rules() {
   # yabai -m rule --add app="Spotify" space=3
   # Exclude specific applications from being managed
    apps_to_exclude=(
+     "^System Information$"
+     "^UTM$"
+     "^VMware Fusion$"
+     "^VirtualBox VM$"
+     "^qBittorrent$"
+     "^VirtualBox$"
      "^Activity Monitor$"
      "^App Store$"
      "^Archive Utility$"
@@ -117,6 +148,7 @@ add_yabai_rules() {
      "^System Preferences$"
      "^System Settings$"
      "^Tuple$"
+     "^unetbootin$"
    )
 
    for app in "${apps_to_exclude[@]}"; do
