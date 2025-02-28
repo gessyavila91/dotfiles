@@ -81,7 +81,7 @@ shift + alt - n : yabai -m space --create && \
                   yabai -m space --focus "${index}"
 
 # balance size of windows
-shift + alt - 0 : yabai -m space --balance
+shift + alt - home : yabai -m space --balance
 
 # swap window
 shift + alt - j : yabai -m window --swap west
