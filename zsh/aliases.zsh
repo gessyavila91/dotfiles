@@ -1,5 +1,5 @@
 # lazy zshrc reload
-alias zshrld='source ~/.zshrc'
+alias zshrld='source ~/.config/zsh/.zshrc'
 
 # Crear cdtree para ejecutar tree después de cambiar de directorio
 alias cdtree='builtin cd "$@" && lsd --tree --depth 2'

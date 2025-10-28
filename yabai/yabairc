@@ -59,6 +59,7 @@ add_yabai_rules() {
     "^CLI Interpreters$"
     "^Choose Properties$"
     "^Composer$"
+    "^Command Line Tools$"
     "^Copy$"
     "^Create New PHP File.*$"
     "^Data Sources and Drivers$"

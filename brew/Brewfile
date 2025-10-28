@@ -1,0 +1,109 @@
+tap "dracula/install"
+tap "felixkratz/formulae"
+tap "homebrew/bundle"
+tap "homebrew/services"
+tap "jandedobbeleer/oh-my-posh"
+tap "koekeishiya/formulae"
+# Clone of cat(1) with syntax highlighting and Git integration
+brew "bat"
+# Interpreted, interactive, object-oriented programming language
+brew "python@3.13"
+# Linux/OSX/FreeBSD resource monitor
+brew "bpytop"
+# Object-file caching compiler wrapper
+brew "ccache"
+# Cross-platform make
+brew "cmake"
+# Dependency Manager for PHP
+brew "composer"
+# Pack, ship and run any application as a lightweight container
+brew "docker"
+# Simple, fast and user-friendly alternative to find
+brew "fd"
+# Create thumbnails for your video files
+brew "ffmpegthumbnailer"
+# Command-line fuzzy finder written in Go
+brew "fzf"
+# Perfect hash function generator
+brew "gperf"
+# Tools and libraries to manipulate images in many formats
+brew "imagemagick"
+# Lightweight and flexible command-line JSON processor
+brew "jq"
+# Clone of ls with colorful output, file type icons, and more
+brew "lsd"
+# Powerful, lightweight programming language
+brew "lua"
+# Open source relational database management system
+brew "mysql", restart_service: true
+# Fast, highly customisable system info script
+brew "neofetch"
+# Ambitious Vim-fork focused on extensibility and agility
+brew "neovim"
+# Small build system for use with gyp or CMake
+brew "ninja"
+# Platform built on V8 to build network applications
+brew "node"
+# Retrieves currently playing media, and simulates media actions
+brew "nowplaying-cli"
+# Prompt theme engine for any shell
+brew "oh-my-posh"
+# Execute binaries from Python packages in isolated environments
+brew "pipx"
+# Fast, disk space efficient package manager
+brew "pnpm"
+# PDF rendering library (based on the xpdf-3.0 code base)
+brew "poppler"
+# Generic machine emulator and virtualizer
+brew "qemu"
+# Search tool like grep and The Silver Searcher
+brew "ripgrep"
+# 7-Zip is a file archiver with a high compression ratio
+brew "sevenzip"
+# Command-line interface for https://speedtest.net bandwidth tests
+brew "speedtest-cli"
+# Organize software neatly under a single directory tree (e.g. /usr/local)
+brew "stow"
+# Change macOS audio source from the command-line
+brew "switchaudio-osx"
+# Display directories as trees (with optional color/HTML output)
+brew "tree"
+# Zephyr meta-tool
+brew "west"
+# Internet file retriever
+brew "wget"
+# Blazing fast terminal file manager written in Rust, based on async I/O
+brew "yazi"
+# Shell extension to navigate your filesystem faster
+brew "zoxide"
+# A window border system for macOS
+brew "felixkratz/formulae/borders"
+# Custom macOS statusbar with shell plugin, interaction and graph support
+brew "felixkratz/formulae/sketchybar"
+# Simple hotkey-daemon for macOS.
+brew "koekeishiya/formulae/skhd"
+# A tiling window manager for macOS based on binary space partitioning.
+brew "koekeishiya/formulae/yabai"
+# Dark theme for GitKraken
+cask "dracula-gitkraken"
+cask "font-hack-nerd-font"
+cask "font-sf-pro"
+cask "font-symbols-only-nerd-font"
+# Terminal emulator as alternative to Apple's Terminal app
+cask "iterm2"
+# GPU-based terminal emulator
+cask "kitty"
+# Control your tools with a few keystrokes
+cask "raycast"
+# Tool that provides consistent, highly configurable symbols for apps
+cask "sf-symbols"
+# App that enables mouse-free UI interaction
+cask "shortcat"
+# Replacement for the volume, brightness and keyboard backlight HUDs
+cask "slimhud"
+# Music streaming service
+cask "spotify"
+# Text editor for code, markup and prose
+cask "sublime-text"
+# Multimedia player
+cask "vlc"
