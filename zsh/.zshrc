@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
-export PHP_INI_SCAN_DIR="/Users/gessyavila/.config/herd-lite/bin:$PHP_INI_SCAN_DIR"
-export PATH="/path/to/arm-none-eabi-gcc/bin:/Users/gessyavila/.config/herd-lite/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+# export PHP_INI_SCAN_DIR="/Users/gessyavila/.config/herd-lite/bin:$PHP_INI_SCAN_DIR"
+# export PATH="/path/to/arm-none-eabi-gcc/bin:/Users/gessyavila/.config/herd-lite/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.config/herd-lite/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 
+# codebase-memory-mcp --ui=true --port=9749
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -119,3 +122,6 @@ source ~/.config/zsh/plugins.zsh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+
+# opencode
+export PATH=/Users/gessyavila/.opencode/bin:$PATH

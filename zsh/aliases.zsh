@@ -22,7 +22,10 @@ alias cat='bat --style=numbers,changes'
 alias cpydir='pwd | pbcopy && echo "The current directory path has been copied to the clipboard."'
 
 # lazy yabairc reload
-alias yabairld='source ~/.config/yabai/yabairc'
+# NOTE: do not source yabairc -- `rule --add` / `signal --add` never replace,
+# so every reload stacks another ~120 rules and 3 signals onto the running
+# instance. Restarting re-reads the file from a clean slate.
+alias yabairld='yabai --restart-service'
 
 # Laravel/Sail alias
 alias sail='sh $([ -f sail ] && echo sail || echo vendor/bin/sail)'
