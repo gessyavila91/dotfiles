@@ -1,2 +1,7 @@
 .DS_Store
 /coc/extensions/node_modules
+
+# zsh runtime state -- private or regenerated on every shell start
+zsh/.zsh_history
+zsh/.zsh_sessions/
+zsh/.zcompdump*
