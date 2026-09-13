@@ -5,3 +5,10 @@
 zsh/.zsh_history
 zsh/.zsh_sessions/
 zsh/.zcompdump*
+
+# Raycast app data: store-downloaded extension bundles and the AI cache.
+# ~135 MB of compiled js/maps that Raycast re-fetches on its own.
+raycast/
+
+# qBittorrent rewrites these on every run
+qBittorrent/*.ini
