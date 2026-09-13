@@ -1,0 +1,12 @@
+[submodule ".oh-my-zsh"]
+	path = .oh-my-zsh
+	url = https://github.com/ohmyzsh/ohmyzsh.git
+[submodule "zsh/ohmyzsh-custom/plugins/zsh-autosuggestions"]
+	path = zsh/ohmyzsh-custom/plugins/zsh-autosuggestions
+	url = https://github.com/zsh-users/zsh-autosuggestions
+[submodule "zsh/ohmyzsh-custom/plugins/zsh-syntax-highlighting"]
+	path = zsh/ohmyzsh-custom/plugins/zsh-syntax-highlighting
+	url = https://github.com/zsh-users/zsh-syntax-highlighting.git
+[submodule "zsh/ohmyzsh-custom/plugins/fzf-tab"]
+	path = zsh/ohmyzsh-custom/plugins/fzf-tab
+	url = https://github.com/Aloxaf/fzf-tab

@@ -80,7 +80,9 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 # HIST_STAMPS="mm/dd/yyyy"
 
 # Would you like to use another custom folder than $ZSH/custom?
-# ZSH_CUSTOM=/path/to/new-custom-folder
+# Third-party plugins live here, outside the oh-my-zsh submodule, so the
+# parent repo can track them as submodules of their own.
+ZSH_CUSTOM="$HOME/.config/zsh/ohmyzsh-custom"
 
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
