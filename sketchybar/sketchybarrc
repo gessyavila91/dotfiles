@@ -1,6 +1,9 @@
 #!/usr/bin/env lua
 -- sketchybar-v2.22.0
 
+-- Make the SbarLua module available to the Lua interpreter
+package.cpath = package.cpath .. ";" .. os.getenv("HOME") .. "/.local/share/sketchybar_lua/?.so"
+
 -- Load the sketchybar-package and prepare the helper binaries
 require("helpers")
 require("init")
