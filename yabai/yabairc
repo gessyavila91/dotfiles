@@ -28,7 +28,7 @@ apply_yabai_config() {
     right_padding 10
     window_gap 10
     external_bar all:36:3
-    window_opacity on
+    window_opacity off
     window_opacity_duration 0.5
     active_window_opacity 0.98
     normal_window_opacity 0.80
@@ -103,17 +103,6 @@ add_yabai_rules() {
     yabai -m rule --add app="Safari" title="$app_tittle" manage=off
   done
 
-  browser_exclude_titles=(
-    "^Add File to Git$"
-    "^PayPal Checkout - Brave$"
-    "^Welcome to.*$"
-    "^(General|(Tab|Password|Website|Extension)s|AutoFill|Se(arch|curity)|Privacy|Advance)$"
-  )
-  for app_tittle in "${browser_exclude_titles[@]}"; do
-    yabai -m rule --add app="Brave Browser" title="$app_tittle" manage=off
-    yabai -m rule --add app="Safari" title="$app_tittle" manage=off
-  done
-
   yabai -m rule --add app="Spotify" title="^Spotify Premium$" manage=off
   yabai -m rule --add label="Spotify" app="^Spotify$" title="Spotify Premium" manage=off
 
@@ -156,6 +145,10 @@ add_yabai_rules() {
      yabai -m rule --add app="$app" manage=off
    done
 }
+
+yabai -m signal --add app='^Ghostty$' event=window_created action='yabai -m space --layout bsp'
+yabai -m signal --add app='^Ghostty$' event=window_destroyed action='yabai -m space --layout bsp'
+yabai -m rule --add app="^Finder$" manage=off
 
 # Apply configuration and rules
 apply_yabai_config
