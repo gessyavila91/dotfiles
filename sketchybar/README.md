@@ -163,6 +163,46 @@ Si (1) devuelve `0` y (2) no encuentra nada, es SbarLua. Confirmarlo con:
 lua -e 'print(pcall(require, "sketchybar"))'    # -> false  module 'sketchybar' not found
 ```
 
+## Widget de métricas (CPU / GPU / RAM / HDD)
+
+`items/widgets/metrics.lua`. Dos trampas que ya costaron una vez:
+
+**Los event providers aceptan exactamente dos argumentos**, `"<evento>" "<freq>"`.
+Cualquier otra cosa — un `--quiet`, por ejemplo — hace que impriman el usage y
+mueran al instante, dejando los labels en blanco sin ningún error.
+
+```sh
+# comprobar que los tres viven
+ps -eo comm | grep -E "cpu_load|memory_load|hdd_load"   # -> 3 líneas
+```
+
+**`subscribe` de SbarLua es `(evento, función)`.** Pasarle una tabla
+`{ event = ..., action = ... }` no da error: SbarLua la lee como un array de
+nombres de evento, no encuentra ninguno y registra cero suscripciones. El item
+se dibuja pero nunca se actualiza.
+
+```lua
+cpu:subscribe("cpu_update", function(env) ... end)   -- BIEN
+cpu:subscribe({ event = "cpu_update", ... })         -- silenciosamente inerte
+```
+
+**GPU no usa provider.** No hay uno, y `powermetrics` exige sudo. Se lee del
+registro IO, que en Apple Silicon no necesita privilegios:
+
+```sh
+ioreg -r -d 1 -w 0 -c IOAccelerator | grep -o '"Device Utilization %"=[0-9]*'
+```
+
+El polling cada 2 s lanza un proceso por muestra. Si pesa, subir `update_freq`
+en el item `widgets.gpu` a 5.
+
+**El % de HDD mide `/System/Volumes/Data`, no `/`.** En APFS el volumen raíz es
+de solo lectura y marca ~3%; comparar contra `df -h /System/Volumes/Data`.
+
+**SF Symbols no tiene glifo de GPU** (solo `cpu`, `cpu.fill`, `memorychip` y sus
+variantes), por eso `icons.gpu` es el texto `"GPU"` y lleva `padding_right` que
+los glifos no necesitan.
+
 ## Recomendaciones
 
 **Reiniciar en frío tras tocar SbarLua.** `sketchybar --reload` solo recarga la

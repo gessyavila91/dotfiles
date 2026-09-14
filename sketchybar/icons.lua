@@ -9,6 +9,9 @@ local icons = {
     cpu = "􀫥",
     memory = "􀫦",
     hdd = "􀥾",
+    -- SF Symbols has no GPU glyph (checked name_availability.plist: only
+    -- cpu, cpu.fill, memorychip, memorychip.fill), so use a text label.
+    gpu = "GPU",
     brew = "􀐚",
     mail = "􀍕",
     messages = "􀌤",
@@ -54,6 +57,9 @@ local icons = {
     apple = "􀝶",
     gear = "",
     cpu = "",
+    memory = "󰍛",
+    hdd = "󰋊",
+    gpu = "󰢮",
     clipboard = "Missing Icon",
 
     switch = {
