@@ -1,4 +1,3 @@
-```markdown
 # Dotfiles Configuration for macOS
 
 This repository contains my personal configurations for various tools and applications, stored in the `~/.config` directory. It is designed to streamline the setup process for future macOS installations.
@@ -25,6 +24,31 @@ The repository is structured as follows:
 ├── yabai
 ├── yazi
 └── zsh
+```
+
+---
+
+## 🔧 Mantenimiento por herramienta
+
+El stack de ventanas tiene modos de fallo **silenciosos**: los daemons siguen
+corriendo y aparentan estar sanos mientras la funcionalidad está rota. Cada
+carpeta tiene su runbook con los checks a correr **después de cada
+`brew upgrade`**:
+
+| Runbook | Qué se rompe en silencio |
+|---|---|
+| [`yabai/README.md`](yabai/README.md) | El hash de `/etc/sudoers.d/yabai` deja de coincidir en **cada upgrade** y la scripting addition no carga: se pierde crear/destruir espacios sin ningún aviso |
+| [`skhd/README.md`](skhd/README.md) | Casi todos los bindings llaman a yabai, así que un atajo muerto suele ser un problema de yabai, no de skhd |
+| [`sketchybar/README.md`](sketchybar/README.md#-mantenimiento) | SbarLua no es un paquete de brew; si falta, la barra queda con **cero items** y el proceso sigue vivo |
+| [`borders/README.md`](borders/README.md) | Sin confianza del tap desaparece de `brew services list` aunque esté corriendo |
+
+Transversal a los cuatro: Homebrew 7.x exige **confiar** los taps de terceros
+antes de cargar sus fórmulas. Un paquete sin confianza no falla ruidosamente —
+brew deja de verlo en `outdated` y `upgrade`. Revisar con:
+
+```bash
+brew tap-info <tap>    # busca "Untrusted"
+cat ~/.homebrew/trust.json
 ```
 
 ---
