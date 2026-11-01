@@ -7,6 +7,9 @@
 #   - enlaces de ~/.claude/ y ~/.config/git/hooks/: faltan, estan rotos, apuntan a otro
 #     sitio, o son archivos normales (se dice si su contenido difiere del repo);
 #   - los enlaces del manifiesto (si existe) que ya no son validos;
+#   - en modo copia (el manifiesto tiene lineas copia; sin manifiesto, P4_COPY=1 o Windows),
+#     en vez de enlaces se comparan las copias con el repo: faltan, son enlaces, difieren
+#     (cambios a mano o repo cambiado sin repetir la instalacion) o su origen ya no existe;
 #   - core.hooksPath distinto de ~/.config/git/hooks;
 #   - settings.json distinto del regenerado con merge-settings.mjs (mismos --os, --home y
 #     machine.env; sin machine.env se usa machine.env.example y se avisa);
@@ -45,6 +48,24 @@ SET_TMP=$(mktemp) || exit 1
 trap 'rm -f "$DIFS" "$SET_TMP"' EXIT
 dif() { printf 'diferencia: %s\n' "$*" >> "$DIFS"; }
 
+# --- modo: enlaces o copias ---------------------------------------------------
+TIENE_OS=1; detectar_os || TIENE_OS=0
+MODO=enlace
+if [ -f "$MANIFEST" ]; then
+  grep -q "^copia$TAB" "$MANIFEST" && MODO=copia
+elif [ "${P4_COPY:-0}" = 1 ] || { [ "$TIENE_OS" = 1 ] && [ "$OS" = windows ]; }; then
+  MODO=copia
+fi
+
+# revisar_copia <destino> <origen>
+revisar_copia() {
+  if [ -L "$1" ]; then dif "$1 es un enlace (a $(readlink "$1")); deberia ser una copia de $2"
+  elif [ ! -e "$1" ]; then dif "falta la copia $1 (de $2)"
+  elif [ ! -e "$2" ]; then dif "la copia $1 ya no tiene origen en el repo ($2)"
+  elif ! mismo_contenido "$1" "$2"; then dif "la copia $1 difiere de $2 (cambios a mano, o repita la instalacion)"
+  fi
+}
+
 # --- enlaces -----------------------------------------------------------------
 # revisar_enlace <destino> <origen esperado o vacio>
 revisar_enlace() {
@@ -68,19 +89,27 @@ revisar_enlace() {
 # Los hooks de git solo se revisan si el manifiesto dice que el instalador los puso
 # (si la carpeta tenia contenido ajeno, los omitio a proposito).
 GIT_INSTALADOS=0
-if [ -f "$MANIFEST" ] && grep -q "^link$TAB$GITHOOKS_DIR/" "$MANIFEST"; then GIT_INSTALADOS=1; fi
+if [ -f "$MANIFEST" ] && grep -q -e "^link$TAB$GITHOOKS_DIR/" -e "^copia$TAB$GITHOOKS_DIR/" "$MANIFEST"; then GIT_INSTALADOS=1; fi
 [ "$GIT_INSTALADOS" = 1 ] || aviso "hooks de git no instalados en este equipo segun el manifiesto; no se revisan"
 PARES=$(pares_repo "$REPO" "$CLAUDE_DIR" "$GITHOOKS_DIR")
+NL='
+'
+NL_PARES="$NL$PARES$NL"
 while IFS="$TAB" read -r dest orig; do
   [ -n "$dest" ] || continue
   case $dest in "$GITHOOKS_DIR"/*) [ "$GIT_INSTALADOS" = 1 ] || continue ;; esac
-  revisar_enlace "$dest" "$orig"
+  if [ "$MODO" = copia ]; then revisar_copia "$dest" "$orig"; else revisar_enlace "$dest" "$orig"; fi
 done <<EOF
 $PARES
 EOF
 if [ -f "$MANIFEST" ]; then
   while IFS="$TAB" read -r kind ruta extra; do
-    [ "$kind" = link ] && revisar_enlace "$ruta" "$extra"
+    case $kind in
+      link) revisar_enlace "$ruta" "$extra" ;;
+      copia)
+        # Las que el repo aun tiene ya se revisaron arriba.
+        case $NL_PARES in *"$NL$ruta$TAB"*) ;; *) revisar_copia "$ruta" "$extra" ;; esac ;;
+    esac
   done < "$MANIFEST"
 fi
 
@@ -90,7 +119,7 @@ case $hp in "~/"*) hp="$HOME/${hp#"~/"}" ;; esac
 [ "$GIT_INSTALADOS" = 0 ] || [ "$hp" = "$GITHOOKS_DIR" ] || dif "core.hooksPath vale '${hp:-(sin fijar)}' y deberia valer $GITHOOKS_DIR"
 
 # --- settings.json ------------------------------------------------------------
-if ! detectar_os; then
+if [ "$TIENE_OS" = 0 ]; then
   aviso "sistema no soportado ($(uname -s)); se omite la comprobacion de settings.json"
 elif ! settings_regenerar "$REPO" "$OS" "$SET_TMP"; then
   dif "no se pudo regenerar settings.json con merge-settings.mjs"

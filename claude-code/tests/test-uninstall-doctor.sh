@@ -354,4 +354,80 @@ if [ "$RC" -eq 1 ] && grep -q 'CLAUDE.md apunta a rel-destino' "$TMP/out" && gre
 else ko "doctor_shows_relative_link_target ($RC)"; cat "$TMP/out"; fi
 rm -rf "$TMP"
 
+# ===========================================================================
+# Modo copia (--copy; Windows)
+
+# uninstall_copy_mode_restores_previous_state: como en modo enlace, y ademas una
+# actualizacion intermedia (copia previa en p4-copias-previas) que no se restaura.
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/propia"
+cp -R "$CLON/skills/estado" "$CASA/.claude/skills/estado"
+echo 'contenido propio' > "$CASA/.claude/skills/propia/SKILL.md"
+echo '{"model":"mio"}' > "$CASA/.claude/settings.json"
+echo 'nota' > "$CASA/.claude/otro.txt"
+printf '[user]\n\tname = prueba\n' > "$TMP/gitconfig"
+antes=$(huella "$CASA")
+gc_antes=$(cat "$TMP/gitconfig")
+instalar --copy --adopt --non-interactive; rc_i=$RC
+echo "# regla nueva" >> "$CLON/CLAUDE.md"
+instalar --copy --non-interactive; rc_i2=$RC
+a_dry=$(estado_total)
+desinstalar --dry-run; rc_dry=$RC
+[ "$a_dry" = "$(estado_total)" ] || rc_dry=99
+desinstalar
+despues=$(huella "$CASA")
+bien=1
+[ "$rc_i" -eq 0 ] && [ "$rc_i2" -eq 0 ] || { bien=0; echo "  install rc=$rc_i $rc_i2"; cat "$TMP/err"; }
+[ "$rc_dry" -eq 0 ] || { bien=0; echo "  dry-run rc=$rc_dry"; }
+[ "$RC" -eq 0 ] || { bien=0; echo "  uninstall rc=$RC"; cat "$TMP/err"; }
+[ "$antes" = "$despues" ] || { bien=0; printf '%s\n' "$antes" > "$TMP/a"; printf '%s\n' "$despues" | diff "$TMP/a" - | head -20; }
+[ "$(cat "$TMP/gitconfig")" = "$gc_antes" ] || { bien=0; echo "  gitconfig"; cat "$TMP/gitconfig"; }
+[ -f "$CLON/skills/propia/SKILL.md" ] || { bien=0; echo "  lo adoptado se borro del repo"; }
+[ ! -e "$CASA/.claude/.p4-manifest" ] || { bien=0; echo "  manifiesto sigue"; }
+desinstalar
+[ "$RC" -eq 1 ] || { bien=0; echo "  segunda vez rc=$RC"; }
+[ "$bien" -eq 1 ] && ok uninstall_copy_mode_restores_previous_state || ko uninstall_copy_mode_restores_previous_state
+rm -rf "$TMP"
+
+# uninstall_copy_mode_keeps_edited_copy: una copia con cambios a mano se conserva y se avisa;
+# las demas se quitan.
+nuevo_entorno
+instalar --copy --non-interactive; rc_i=$RC
+echo "mi cambio" >> "$CASA/.claude/CLAUDE.md"
+echo "otro cambio" >> "$CASA/.claude/skills/estado/SKILL.md"
+cp "$CASA/.claude/CLAUDE.md" "$TMP/editado"
+desinstalar
+bien=1
+[ "$rc_i" -eq 0 ] && [ "$RC" -eq 0 ] || { bien=0; echo "  rc $rc_i $RC"; cat "$TMP/err"; }
+cmp -s "$CASA/.claude/CLAUDE.md" "$TMP/editado" || { bien=0; echo "  se perdio la copia editada"; }
+grep -q 'otro cambio' "$CASA/.claude/skills/estado/SKILL.md" 2>/dev/null || { bien=0; echo "  se perdio la skill editada"; }
+grep -q 'resumen de avisos' "$TMP/out" && grep -q "CLAUDE.md" "$TMP/out" || { bien=0; echo "  sin aviso"; cat "$TMP/out"; }
+[ ! -e "$CASA/.claude/hooks/gitflow-guard.sh" ] && [ ! -e "$CASA/.config/git/hooks/pre-push" ] || { bien=0; echo "  quedaron copias sin editar"; }
+[ ! -e "$CASA/.claude/.p4-manifest" ] || { bien=0; echo "  manifiesto sigue"; }
+[ "$bien" -eq 1 ] && ok uninstall_copy_mode_keeps_edited_copy || ko uninstall_copy_mode_keeps_edited_copy
+rm -rf "$TMP"
+
+# doctor_copy_mode_clean_after_install
+nuevo_entorno
+instalar --copy --non-interactive
+doctor
+if [ "$RC" -eq 0 ] && ! grep -q '^diferencia' "$TMP/out"; then ok doctor_copy_mode_clean_after_install
+else ko "doctor_copy_mode_clean_after_install (rc=$RC)"; cat "$TMP/out" "$TMP/err"; fi
+rm -rf "$TMP"
+
+# doctor_copy_mode_detects_edited_copy: copia editada, copia que falta y repo cambiado.
+nuevo_entorno
+instalar --copy --non-interactive
+echo "mi cambio" >> "$CASA/.claude/CLAUDE.md"
+doctor; r1=$RC; o1=$(cat "$TMP/out")
+rm -f "$CASA/.config/git/hooks/pre-push"
+echo "linea nueva" >> "$CLON/skills/estado/SKILL.md"
+a=$(estado_total)
+doctor
+if [ "$r1" -eq 1 ] && printf '%s\n' "$o1" | grep -q 'CLAUDE.md.*difiere' \
+  && [ "$RC" -eq 1 ] && grep -q 'pre-push' "$TMP/out" && grep -q 'skills/estado.*difiere' "$TMP/out" \
+  && [ "$a" = "$(estado_total)" ]; then ok doctor_copy_mode_detects_edited_copy
+else ko "doctor_copy_mode_detects_edited_copy ($r1, $RC)"; printf '%s\n' "$o1"; cat "$TMP/out"; fi
+rm -rf "$TMP"
+
 exit $FAIL

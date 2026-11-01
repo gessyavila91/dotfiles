@@ -1,12 +1,13 @@
 #!/bin/sh
-# install.sh: instala la configuracion de Claude Code de este clon en $HOME (macOS y Linux).
-# POSIX sh. Uso: install.sh [--dry-run] [--adopt] [--non-interactive]
+# install.sh: instala la configuracion de Claude Code de este clon en $HOME (macOS, Linux
+# y Windows con Git Bash). POSIX sh. Uso: install.sh [--dry-run] [--adopt] [--non-interactive] [--copy]
 #
 # Codigos de salida: 0 bien; 2 hay destinos ajenos (sin --adopt, o con --adopt y el
 # repo ya tiene una version distinta; o, con o sin --adopt, ~/.claude, sus carpetas
 # skills/hooks/themes o ~/.config/git/hooks son enlaces simbolicos o resuelven dentro
-# del clon o fuera de HOME); 3 falta un requisito (node o git) o el sistema
-# no es macOS ni Linux; 1 cualquier otro fallo (p. ej. HOME vacio o relativo).
+# del clon o fuera de HOME; o la instalacion existente usa el otro modo, enlaces o
+# copias); 3 falta un requisito (node o git) o el sistema no es macOS, Linux ni Windows
+# con Git Bash; 1 cualquier otro fallo (p. ej. HOME vacio o relativo).
 #
 # Pasos (cada uno idempotente; el manifiesto se anota por paso, asi que volver a
 # ejecutar tras una interrupcion converge al mismo estado):
@@ -28,6 +29,13 @@
 #   Las rutas listadas en adopt-ignore (relativas a ~/.claude, literales) que el repo no
 #   tiene no se adoptan, respaldan ni enlazan, y no son conflicto: "ignorado: <ruta>".
 #
+# Modo copia (--copy, o P4_COPY=1 en el entorno, que es lo que fija install.ps1; en
+# Windows siempre): copia en vez de enlazar. Es "nuestra" la copia que el manifiesto anota
+# (linea copia). Copia identica al repo: nada que hacer; copia nuestra distinta: se guarda
+# la anterior en <respaldo>/p4-copias-previas/ y se pone la del repo; destino que no es
+# nuestro: conflicto o --adopt igual que con enlaces. Los hooks de git se copian (los 14
+# nombres son copias de dispatch). Tras cambiar algo en el repo hay que repetir la instalacion.
+#
 # P4_FAIL_AFTER=<paso> (SOLO PARA PRUEBAS): termina con 1 justo despues del paso
 # indicado, para comprobar que repetir la instalacion converge.
 
@@ -39,14 +47,16 @@ SELF_DIR=$(cd "$(dirname "$0")" && pwd -P) || exit 1
 REPO=$SELF_DIR
 . "$REPO/lib/common.sh"
 
-DRY=0; ADOPT=0; NONINT=0
+DRY=0; ADOPT=0; NONINT=0; COPIA=0
+[ "${P4_COPY:-0}" = 1 ] && COPIA=1
 for a in "$@"; do
   case $a in
     --dry-run) DRY=1 ;;
     --adopt) ADOPT=1 ;;
     --non-interactive) NONINT=1 ;;
+    --copy) COPIA=1 ;;
     -h|--help) sed -n '2,3p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) error "opcion desconocida: $a"; echo "uso: install.sh [--dry-run] [--adopt] [--non-interactive]" >&2; exit 1 ;;
+    *) error "opcion desconocida: $a"; echo "uso: install.sh [--dry-run] [--adopt] [--non-interactive] [--copy]" >&2; exit 1 ;;
   esac
 done
 
@@ -77,11 +87,12 @@ for c in git node; do
 done
 command -v claude >/dev/null 2>&1 || aviso "no se encontro 'claude'; los MCP no se registraran"
 command -v docker >/dev/null 2>&1 || aviso "no se encontro 'docker'; MCP_DOCKER no funcionara hasta instalarlo"
-case $(uname -s) in
-  Darwin) OS=macos ;;
-  Linux) OS=linux ;;
-  *) error "sistema no soportado: $(uname -s) (en Windows use install.ps1)"; exit 3 ;;
-esac
+if ! detectar_os; then
+  error "sistema no soportado: $(uname -s) (en Windows use install.ps1, que usa Git Bash)"; exit 3
+fi
+# En Git Bash `ln -s` copia en silencio salvo con modo desarrollador: en Windows, siempre copias.
+[ "$OS" = windows ] && COPIA=1
+[ "$COPIA" = 1 ] && info "modo copia: se copian los archivos en vez de enlazarlos"
 paso requisitos
 
 # --- analisis: que enlazar y que conflictos hay (no escribe nada) ----------
@@ -98,6 +109,11 @@ pares() {
     for d in "$CLAUDE_DIR/$sub"/*; do
       [ -e "$d" ] || [ -L "$d" ] || continue
       [ -e "$REPO/$sub/${d##*/}" ] && continue
+      # Copia nuestra de algo que el repo ya no tiene: no se readopta.
+      if manifiesto_copia "$CLAUDE_DIR/.p4-manifest" "$d" >/dev/null; then
+        aviso "no se adopta $d: es una copia instalada de algo que el repo ya no tiene (quitar a mano)"
+        continue
+      fi
       # adopt-ignore: solo afecta a entradas que el repo no tiene (las del repo siguen
       # el camino normal). Se anota como linea especial para informarlo fuera.
       if en_adopt_ignore "$REPO" "$sub/${d##*/}"; then
@@ -148,12 +164,25 @@ for c in "$CLAUDE_DIR" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/the
     CONFLICTO=2
   fi
 done
+# Una instalacion es de enlaces o de copias: cambiar de modo exige desinstalar antes.
+MANIFIESTO="$CLAUDE_DIR/.p4-manifest"
+if [ "$CONFLICTO" = 0 ] && [ -f "$MANIFIESTO" ]; then
+  if [ "$COPIA" = 1 ]; then otro=link; nombre_otro=enlaces; else otro=copia; nombre_otro=copias; fi
+  if grep -q "^$otro$TAB" "$MANIFIESTO"; then
+    error "la instalacion actual usa $nombre_otro; ejecute uninstall.sh antes de cambiar de modo"
+    CONFLICTO=2
+  fi
+fi
 LISTA=
 [ "$CONFLICTO" = 0 ] && LISTA=$(pares)
 while IFS="$TAB" read -r dest orig; do
   [ -n "$dest" ] || continue
   if [ "$dest" = "#ignorado" ]; then info "ignorado: $orig (adopt-ignore)"; continue; fi
-  if es_nuestro "$dest" "$orig"; then
+  if [ "$COPIA" = 1 ] && copia_nuestra "$MANIFIESTO" "$dest" "$orig"; then
+    if mismo_contenido "$dest" "$orig"; then printf 'ok\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
+    else printf 'actualizar\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
+    fi
+  elif [ "$COPIA" = 0 ] && es_nuestro "$dest" "$orig"; then
     printf 'ok\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
   elif [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
     printf 'crear\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
@@ -182,7 +211,7 @@ done <<EOF
 $LISTA
 EOF
 if [ "$CONFLICTO" = 2 ]; then
-  error "hay carpetas de destino que no son carpetas normales dentro de HOME; no se toca nada"
+  error "no se toca nada; resuelva lo anterior y repita"
   exit 2
 fi
 if [ "$CONFLICTO" = 1 ]; then
@@ -221,10 +250,26 @@ if [ ! -f "$MACHINE_ENV" ]; then
 fi
 paso machine
 
-# --- enlaces en ~/.claude/ -------------------------------------------------
+# --- enlaces (o copias) en ~/.claude/ ---------------------------------------
+if [ "$COPIA" = 1 ]; then KIND=copia; else KIND=link; fi
+# poner_copia <origen> <destino> <reemplazar: 0|1>: anota la copia en el manifiesto (antes de
+# escribir: si se corta, repetir la reconoce como nuestra), y la pone. Con reemplazar=1 la
+# copia anterior va a p4-copias-previas justo antes de mover la nueva a su sitio.
+poner_copia() {
+  manifiesto_add "copia$TAB$2$TAB$1"
+  _pc_t=$(mktemp -d "$(dirname "$2")/.p4-tmp.XXXXXX") || return 1
+  if ! cp -Rp "$1" "$_pc_t/x"; then rm -rf "$_pc_t"; return 1; fi
+  if [ "$3" = 1 ]; then respaldar_copia_previa "$2" || { rm -rf "$_pc_t"; return 1; }; fi
+  mv "$_pc_t/x" "$2" && rmdir "$_pc_t"
+}
 while IFS="$TAB" read -r acc dest orig; do
   case $acc in
-    ok) manifiesto_add "link$TAB$dest$TAB$orig"; continue ;;
+    ok) manifiesto_add "$KIND$TAB$dest$TAB$orig"; continue ;;
+    actualizar)
+      if hacer "actualizar la copia $dest desde $orig (la anterior va al respaldo)"; then
+        poner_copia "$orig" "$dest" 1 || { error "no se pudo actualizar $dest"; exit 1; }
+      fi
+      continue ;;
     adoptar-nuevo)
       if hacer "adoptar $dest: copiar al repo en $orig (commitearlo despues)"; then
         cp -Rp "$dest" "$orig" || { error "no se pudo copiar $dest al repo"; exit 1; }
@@ -238,7 +283,11 @@ while IFS="$TAB" read -r acc dest orig; do
       fi ;;
   esac
   asegurar_dir "$(dirname "$dest")" || { error "no se pudo crear $(dirname "$dest")"; exit 1; }
-  if hacer "enlazar $dest -> $orig"; then
+  if [ "$COPIA" = 1 ]; then
+    if hacer "copiar $orig -> $dest"; then
+      poner_copia "$orig" "$dest" 0 || { error "no se pudo copiar $dest"; exit 1; }
+    fi
+  elif hacer "enlazar $dest -> $orig"; then
     ln -s "$orig" "$dest" || { error "no se pudo enlazar $dest"; exit 1; }
     manifiesto_add "link$TAB$dest$TAB$orig"
   fi
@@ -257,8 +306,13 @@ if [ -e "$GITHOOKS_DIR" ] && [ ! -d "$GITHOOKS_DIR" ]; then
 elif [ -d "$GITHOOKS_DIR" ]; then
   for e in "$GITHOOKS_DIR"/* "$GITHOOKS_DIR"/.[!.]*; do
     [ -e "$e" ] || [ -L "$e" ] || continue
+    # Temporal de una copia interrumpida: no es contenido ajeno.
+    [ "$COPIA" = 1 ] && case ${e##*/} in .p4-tmp.*) continue ;; esac
     o=$(origen_githook "${e##*/}")
-    if [ -z "$o" ] || ! es_nuestro "$e" "$o"; then ajeno=$e; break; fi
+    if [ -z "$o" ]; then ajeno=$e; break; fi
+    if [ "$COPIA" = 1 ]; then copia_nuestra "$MANIFIESTO" "$e" "$o" || { ajeno=$e; break; }
+    elif ! es_nuestro "$e" "$o"; then ajeno=$e; break
+    fi
   done
 fi
 if [ -n "$ajeno" ]; then
@@ -267,6 +321,17 @@ else
   asegurar_dir "$GITHOOKS_DIR" || { error "no se pudo crear $GITHOOKS_DIR"; exit 1; }
   for n in $(cat "$REPO/git-hooks/NAMES") lib.sh; do
     o=$(origen_githook "$n"); d="$GITHOOKS_DIR/$n"
+    if [ "$COPIA" = 1 ]; then
+      if copia_nuestra "$MANIFIESTO" "$d" "$o"; then
+        if mismo_contenido "$d" "$o"; then manifiesto_add "copia$TAB$d$TAB$o"
+        elif hacer "actualizar la copia $d desde $o (la anterior va al respaldo)"; then
+          poner_copia "$o" "$d" 1 || { error "no se pudo actualizar $d"; exit 1; }
+        fi
+      elif hacer "copiar $o -> $d"; then
+        poner_copia "$o" "$d" 0 || { error "no se pudo copiar $d"; exit 1; }
+      fi
+      continue
+    fi
     if es_nuestro "$d" "$o"; then manifiesto_add "link$TAB$d$TAB$o"; continue; fi
     if hacer "enlazar $d -> $o"; then
       ln -s "$o" "$d" || { error "no se pudo enlazar $d"; exit 1; }

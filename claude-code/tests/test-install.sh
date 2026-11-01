@@ -450,4 +450,137 @@ if [ "$r1" -eq 0 ] && [ "$e1" -eq 1 ] && [ "$RC" -eq 2 ] && ! grep -q 'ignorado'
 else ko "install_adopt_ignore_only_unknown_entries ($r1 $e1 $RC)"; fi
 rm -rf "$TMP"
 
+# ===========================================================================
+# Modo copia (--copy o P4_COPY=1; Windows): copias en vez de enlaces.
+# enlaces_bajo <dir>: lista los enlaces simbolicos que haya debajo.
+enlaces_bajo() { find "$1" -type l 2>/dev/null; }
+
+# install_copy_mode_creates_copies_not_links
+nuevo_entorno
+instalar --copy --non-interactive
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/err"; }
+[ -z "$(enlaces_bajo "$CASA/.claude"; enlaces_bajo "$CASA/.config")" ] || { bien=0; echo "  hay enlaces:"; enlaces_bajo "$CASA"; }
+cmp -s "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  CLAUDE.md"; }
+for s in "$CLON"/skills/* "$CLON"/hooks/* "$CLON"/themes/*; do
+  rel=${s#"$CLON"/}
+  diff -r "$CASA/.claude/$rel" "$s" >/dev/null 2>&1 || { bien=0; echo "  $rel"; }
+done
+[ -x "$CASA/.claude/hooks/gitflow-guard.sh" ] || { bien=0; echo "  modo del hook"; }
+while IFS= read -r n; do
+  { [ -f "$CASA/.config/git/hooks/$n" ] && cmp -s "$CASA/.config/git/hooks/$n" "$CLON/git-hooks/dispatch" \
+    && [ -x "$CASA/.config/git/hooks/$n" ]; } || { bien=0; echo "  git hook $n"; }
+done < "$CLON/git-hooks/NAMES"
+cmp -s "$CASA/.config/git/hooks/lib.sh" "$CLON/git-hooks/lib.sh" || { bien=0; echo "  lib.sh"; }
+[ "$(GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath)" = "$CASA/.config/git/hooks" ] \
+  || { bien=0; echo "  core.hooksPath"; }
+m="$CASA/.claude/.p4-manifest"
+{ grep -qx "copia	$CASA/.claude/CLAUDE.md	$CLON/CLAUDE.md" "$m" \
+  && grep -qx "copia	$CASA/.claude/skills/estado	$CLON/skills/estado" "$m" \
+  && grep -qx "copia	$CASA/.config/git/hooks/pre-push	$CLON/git-hooks/dispatch" "$m" \
+  && ! grep -q '^link	' "$m"; } || { bien=0; echo "  manifiesto"; cat "$m"; }
+[ -f "$CASA/.claude/settings.json" ] || { bien=0; echo "  settings.json"; }
+[ -z "$(respaldos)" ] || { bien=0; echo "  respaldo innecesario"; }
+[ "$bien" -eq 1 ] && ok install_copy_mode_creates_copies_not_links || ko install_copy_mode_creates_copies_not_links
+rm -rf "$TMP"
+
+# install_copy_mode_is_idempotent: P4_COPY=1 (lo que fija el envoltorio .ps1) elige el modo.
+nuevo_entorno
+P4_COPY=1; export P4_COPY
+instalar --non-interactive; rc1=$RC
+antes=$(estado_total)
+instalar --non-interactive; rc2=$RC
+unset P4_COPY
+despues=$(estado_total)
+if [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && [ "$antes" = "$despues" ] && [ -z "$(enlaces_bajo "$CASA")" ] \
+  && [ -z "$(respaldos)" ] && ! grep -q actualizar "$TMP/out"; then
+  ok install_copy_mode_is_idempotent
+else ko "install_copy_mode_is_idempotent (rc $rc1 $rc2)"; printf '%s\n' "$antes" > "$TMP/a"; printf '%s\n' "$despues" | diff "$TMP/a" - | head -20; fi
+rm -rf "$TMP"
+
+# install_copy_mode_updates_changed_repo_file: cambia el repo -> repetir actualiza la copia
+# y guarda la anterior en el respaldo (p4-copias-previas, que uninstall no restaura).
+nuevo_entorno
+instalar --copy --non-interactive; rc1=$RC
+cp "$CASA/.claude/CLAUDE.md" "$TMP/claude-previo"
+echo "# regla nueva" >> "$CLON/CLAUDE.md"
+echo "linea nueva" >> "$CLON/skills/estado/SKILL.md"
+echo "# cambio" >> "$CLON/git-hooks/dispatch"
+instalar --copy --non-interactive; rc2=$RC
+r=$(respaldos)
+bien=1
+[ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] || { bien=0; echo "  rc $rc1 $rc2"; cat "$TMP/err"; }
+cmp -s "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  CLAUDE.md sin actualizar"; }
+diff -r "$CASA/.claude/skills/estado" "$CLON/skills/estado" >/dev/null || { bien=0; echo "  skill sin actualizar"; }
+cmp -s "$CASA/.config/git/hooks/pre-push" "$CLON/git-hooks/dispatch" || { bien=0; echo "  git hook sin actualizar"; }
+[ "$(printf '%s\n' "$r" | grep -c .)" -eq 1 ] || { bien=0; echo "  respaldos: $r"; }
+cmp -s "$r/p4-copias-previas/.claude/CLAUDE.md" "$TMP/claude-previo" || { bien=0; echo "  copia previa no respaldada"; ls -R "$r" | head; }
+[ -z "$(enlaces_bajo "$CASA/.claude")" ] || { bien=0; echo "  enlaces"; }
+[ "$(grep -c "^copia	$CASA/.claude/CLAUDE.md	" "$CASA/.claude/.p4-manifest")" -eq 1 ] || { bien=0; echo "  manifiesto duplicado"; }
+[ -z "$(find "$CASA" -name '.p4-tmp.*')" ] || { bien=0; echo "  quedan temporales"; }
+[ "$bien" -eq 1 ] && ok install_copy_mode_updates_changed_repo_file || ko install_copy_mode_updates_changed_repo_file
+rm -rf "$TMP"
+
+# install_copy_mode_refuses_foreign_file: archivo ajeno (sin y con --adopt si difiere del
+# repo), y una copia identica que no esta en el manifiesto: 2 y nada cambia.
+bien=1
+for caso in ajeno adopt-distinto identico; do
+  nuevo_entorno
+  mkdir -p "$CASA/.claude"
+  if [ "$caso" = identico ]; then cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+  else echo "reglas de otra persona" > "$CASA/.claude/CLAUDE.md"; fi
+  antes=$(estado_total)
+  if [ "$caso" = adopt-distinto ]; then instalar --copy --adopt --non-interactive
+  else instalar --copy --non-interactive; fi
+  { [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ]; } || { bien=0; echo "  $caso rc=$RC"; }
+  [ "$caso" = identico ] || grep -q 'reglas de otra persona' "$TMP/out" "$TMP/err" || { bien=0; echo "  $caso sin diferencia"; }
+  rm -rf "$TMP"
+done
+[ "$bien" -eq 1 ] && ok install_copy_mode_refuses_foreign_file || ko install_copy_mode_refuses_foreign_file
+
+# install_copy_mode_adopt: skill propia (se copia al repo), CLAUDE.md identico, hook con el
+# home literal (gana el repo) y skills/synced (adopt-ignore, no se toca).
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/mia" "$CASA/.claude/skills/synced/docx"
+echo "skill propia" > "$CASA/.claude/skills/mia/SKILL.md"
+echo "cache" > "$CASA/.claude/skills/synced/docx/SKILL.md"
+cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+con_home_literal "$CASA/$G"
+cp "$CASA/$G" "$TMP/hook-original"
+instalar --copy --adopt --non-interactive
+r=$(respaldos)
+m="$CASA/.claude/.p4-manifest"
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/out" "$TMP/err" | head; }
+[ -z "$(enlaces_bajo "$CASA")" ] || { bien=0; echo "  hay enlaces"; }
+[ "$(cat "$CLON/skills/mia/SKILL.md" 2>/dev/null)" = "skill propia" ] || { bien=0; echo "  no se copio al repo"; }
+{ [ -d "$CASA/.claude/skills/mia" ] && diff -r "$CASA/.claude/skills/mia" "$CLON/skills/mia" >/dev/null; } || { bien=0; echo "  copia mia"; }
+[ "$(cat "$r/.claude/skills/mia/SKILL.md" 2>/dev/null)" = "skill propia" ] || { bien=0; echo "  respaldo mia"; }
+cmp -s "$r/$G" "$TMP/hook-original" || { bien=0; echo "  respaldo hook"; }
+cmp -s "$CASA/$G" "$CLON/hooks/cbm-code-discovery-gate" || { bien=0; echo "  hook no es la version del repo"; }
+cmp -s "$r/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  respaldo CLAUDE.md"; }
+grep -q "^adopt	$CLON/skills/mia	" "$m" || { bien=0; echo "  manifiesto adopt"; }
+grep -qx "copia	$CASA/.claude/skills/mia	$CLON/skills/mia" "$m" || { bien=0; echo "  manifiesto copia"; }
+{ [ ! -e "$CLON/skills/synced" ] && [ "$(cat "$CASA/.claude/skills/synced/docx/SKILL.md")" = cache ] \
+  && grep -qx 'ignorado: skills/synced (adopt-ignore)' "$TMP/out"; } || { bien=0; echo "  adopt-ignore"; }
+[ "$bien" -eq 1 ] && ok install_copy_mode_adopt || ko install_copy_mode_adopt
+rm -rf "$TMP"
+
+# install_copy_mode_refuses_mixing_modes: instalado con enlaces -> --copy sale con 2 (y al reves).
+nuevo_entorno
+instalar --non-interactive
+antes=$(estado_total)
+instalar --copy --non-interactive; r1=$RC
+igual1=0; [ "$antes" = "$(estado_total)" ] && igual1=1
+rm -rf "$TMP"
+nuevo_entorno
+instalar --copy --non-interactive
+antes=$(estado_total)
+instalar --non-interactive; r2=$RC
+igual2=0; [ "$antes" = "$(estado_total)" ] && igual2=1
+if [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] && [ "$igual1" -eq 1 ] && [ "$igual2" -eq 1 ] && grep -q 'uninstall' "$TMP/err"; then
+  ok install_copy_mode_refuses_mixing_modes
+else ko "install_copy_mode_refuses_mixing_modes ($r1 $r2 $igual1 $igual2)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
 exit $FAIL

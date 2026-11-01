@@ -10,6 +10,9 @@
 # movido al respaldo se copia de vuelta (de todos los respaldos del manifiesto, del mas
 # antiguo al mas reciente); el respaldo nunca se borra. Lo adoptado al repo no se borra del
 # repo. Lo desconocido en ~/.claude se deja (p. ej. las rutas de adopt-ignore). El manifiesto se quita al final.
+# Copias (modo copia): se quitan solo si son identicas al origen del repo; una copia con
+# cambios (o cuyo origen ya no existe) se conserva y se avisa, y lo que el respaldo tenga
+# en esa ruta no se restaura (queda en el respaldo). p4-copias-previas no se restaura.
 #
 # Antes de cambiar nada comprueba todo; si el estado es incoherente (linea desconocida,
 # enlace de otro clon, ruta fuera de HOME, respaldo ausente, destino de restauracion
@@ -54,6 +57,7 @@ bajo_home() { case $1 in "$HOME"/*) return 0 ;; *) return 1 ;; esac; }
 
 # --- lectura y validacion del manifiesto -------------------------------------
 BACKUPS=; DIRS=; SETTINGS=; SET_EXTRA=; GITCFG_VAL=; HAY_GITCFG=0
+COPIAS=  # "destino<TAB>origen" de cada copia
 while IFS="$TAB" read -r kind ruta extra; do
   [ -n "$kind$ruta" ] || continue
   case $kind in
@@ -68,12 +72,34 @@ while IFS="$TAB" read -r kind ruta extra; do
     link)
       bajo_home "$ruta" || incoherente "enlace fuera de HOME: $ruta"
       case $extra in "$REPO"/*) ;; *) incoherente "$ruta apunta a $extra, que no es de este clon ($REPO)" ;; esac ;;
+    copia)
+      bajo_home "$ruta" || incoherente "copia fuera de HOME: $ruta"
+      case $extra in "$REPO"/*) ;; *) incoherente "$ruta es copia de $extra, que no es de este clon ($REPO)" ;; esac
+      COPIAS="$COPIAS$ruta$TAB$extra$NL" ;;
     settings) bajo_home "$ruta" || incoherente "settings fuera de HOME: $ruta"; SETTINGS=$ruta; SET_EXTRA=$extra ;;
     gitconfig) HAY_GITCFG=1; GITCFG_VAL=$extra ;;
     adopt) ;;
     *) incoherente "linea desconocida en el manifiesto: $kind" ;;
   esac
 done < "$MANIFEST"
+
+# --- copias: cuales se quitan y cuales se conservan ---------------------------
+# QUITAR: copias identicas al repo (se quitan). EDITADAS: con cambios, o enlace, o sin
+# origen (se conservan). Ambas, una ruta por linea, con un salto de linea al principio.
+AVISOS=
+aviso_final() { aviso "$*"; AVISOS="$AVISOS$*$NL"; }
+QUITAR=$NL; EDITADAS=$NL
+while IFS="$TAB" read -r _cd _co; do
+  [ -n "$_cd" ] || continue
+  case $QUITAR$EDITADAS in *"$NL$_cd$NL"*) continue ;; esac
+  if [ ! -e "$_cd" ] && [ ! -L "$_cd" ]; then continue
+  elif [ ! -L "$_cd" ] && mismo_contenido "$_cd" "$_co"; then QUITAR="$QUITAR$_cd$NL"
+  else EDITADAS="$EDITADAS$_cd$NL"
+  fi
+done <<EOF
+$COPIAS
+EOF
+en_lista() { case $1 in *"$NL$2$NL"*) return 0 ;; esac; return 1; }
 
 # --- restauracion desde el respaldo ------------------------------------------
 # restaurar_todo <comprobar|hacer>: recorre, con una cola (sh no tiene variables locales),
@@ -88,7 +114,7 @@ restaurar_todo() {
     [ -n "$_b" ] || continue
     for _x in "$_b"/* "$_b"/.[!.]*; do
       [ -e "$_x" ] || [ -L "$_x" ] || continue
-      case ${_x##*/} in settings.json.p4-*) continue ;; esac
+      case ${_x##*/} in settings.json.p4-*|p4-copias-previas) continue ;; esac
       COLA="$COLA$_x$TAB$HOME/${_x#"$_b"/}$NL"
     done
   done <<EOF
@@ -97,7 +123,13 @@ EOF
   while [ -n "$COLA" ]; do
     _l=${COLA%%"$NL"*}; COLA=${COLA#"$_l$NL"}
     _o=${_l%%"$TAB"*}; _d=${_l#*"$TAB"}
-    if [ -d "$_o" ] && [ ! -L "$_o" ] && [ -d "$_d" ] && [ ! -L "$_d" ]; then
+    # Copia editada que se conserva: lo del respaldo en esa ruta se queda en el respaldo.
+    if en_lista "$EDITADAS" "$_d"; then
+      [ "$1" = hacer ] && aviso_final "no se restaura $_d desde el respaldo: se conserva la copia con cambios; el original sigue en $_o"
+      continue
+    fi
+    _quitar=0; en_lista "$QUITAR" "$_d" && _quitar=1
+    if [ "$_quitar" = 0 ] && [ -d "$_o" ] && [ ! -L "$_o" ] && [ -d "$_d" ] && [ ! -L "$_d" ]; then
       for _e in "$_o"/* "$_o"/.[!.]*; do
         [ -e "$_e" ] || [ -L "$_e" ] || continue
         COLA="$COLA$_e$TAB$_d/${_e##*/}$NL"
@@ -124,8 +156,8 @@ EOF
       VISTOS="$VISTOS$_o$TAB$_d$NL"
     fi
     if [ -e "$_d" ] || [ -L "$_d" ]; then
-      if enlace_al_repo "$_d" "$REPO"; then
-        :  # nuestro: la fase de enlaces lo quita antes de restaurar
+      if enlace_al_repo "$_d" "$REPO" || [ "$_quitar" = 1 ]; then
+        :  # nuestro: la fase de enlaces y copias lo quita antes de restaurar
       elif [ -L "$_o" ] && [ -L "$_d" ] && [ "$(readlink "$_o")" = "$(readlink "$_d")" ]; then
         continue
       elif [ ! -L "$_o" ] && [ ! -L "$_d" ] && mismo_contenido "$_o" "$_d"; then
@@ -144,9 +176,7 @@ EOF
 
 # --- settings.json: de que copia se restaura, o si se puede borrar -----------
 SET_BAK=; SET_ACCION=nada; SET_TMP=$(mktemp) || exit 1
-AVISOS=
 trap 'rm -f "$SET_TMP"' EXIT
-aviso_final() { aviso "$*"; AVISOS="$AVISOS$*$NL"; }
 if [ -n "$SETTINGS" ]; then
   while IFS= read -r _b; do
     [ -n "$_b" ] || continue
@@ -177,8 +207,23 @@ if [ "$INCOH" = 1 ]; then
   exit 2
 fi
 
-# --- 1. enlaces --------------------------------------------------------------
+# --- 1. enlaces y copias -----------------------------------------------------
 while IFS="$TAB" read -r kind ruta extra; do
+  if [ "$kind" = copia ]; then
+    if en_lista "$QUITAR" "$ruta"; then
+      if [ "$DRY" = 1 ] || [ -e "$ruta" ]; then
+        if hacer "quitar copia $ruta (identica al repo)"; then
+          rm -rf "$ruta" || { error "no se pudo quitar $ruta"; exit 1; }
+        fi
+      fi
+    elif en_lista "$EDITADAS" "$ruta"; then
+      # Una vez por ruta aunque el manifiesto la repita.
+      case $AVISOS in *"se conserva $ruta:"*) ;; *)
+        aviso_final "se conserva $ruta: difiere de $extra en el repo (cambios a mano, repo cambiado sin repetir la instalacion, o ya no es una copia); reviselo y borrelo a mano si sobra" ;;
+      esac
+    fi
+    continue
+  fi
   [ "$kind" = link ] || continue
   if enlace_al_repo "$ruta" "$REPO"; then
     if hacer "quitar enlace $ruta"; then

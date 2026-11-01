@@ -13,6 +13,9 @@
 #   dir       carpeta creada por el instalador (extra vacio). Se anota la carpeta
 #             mas externa primero; uninstall la quita solo si queda vacia.
 #   link      enlace simbolico creado; extra = destino (archivo del clon).
+#   copia     archivo o carpeta copiado (modo copia, --copy o P4_COPY=1; Windows);
+#             extra = origen en el clon. El manifiesto es lo que la hace "nuestra":
+#             se anota antes de escribirla. Una instalacion usa enlaces o copias, no ambos.
 #   settings  settings.json (archivo normal, nunca enlace); extra = "generado" (lo escribio el
 #             instalador) o "preexistente" (ya existia identico al generado; uninstall no
 #             lo borra). Una sola linea: la primera instalacion decide.
@@ -23,6 +26,8 @@
 # y ademas lineas
 #   backup=<dir>
 # una por cada carpeta de respaldo creada (la ultima es la mas reciente).
+# Dentro de un respaldo, p4-copias-previas/<ruta relativa a HOME> guarda copias nuestras
+# que se sustituyeron al actualizar (modo copia); uninstall no las restaura.
 
 TAB=$(printf '\t')
 
@@ -107,13 +112,42 @@ ruta_resuelta() {
   printf '%s%s\n' "$(cd -P "$_r" && pwd -P)" "$_resto"
 }
 
-# detectar_os: fija OS (macos|linux) segun uname; devuelve 1 si no se soporta.
+# detectar_os: fija OS (macos|linux|windows) segun uname; devuelve 1 si no se soporta.
+# En Windows solo se admite Git Bash (MINGW/MSYS) o Cygwin.
 detectar_os() {
   case $(uname -s) in
     Darwin) OS=macos ;;
     Linux) OS=linux ;;
+    MINGW*|MSYS*|CYGWIN*) OS=windows ;;
     *) return 1 ;;
   esac
+}
+
+# manifiesto_copia <manifiesto> <destino>: imprime el origen anotado en la linea "copia"
+# de <destino>; devuelve 1 si no hay ninguna.
+manifiesto_copia() {
+  [ -f "$1" ] || return 1
+  while IFS="$TAB" read -r _mc_k _mc_p _mc_e; do
+    if [ "$_mc_k" = copia ] && [ "$_mc_p" = "$2" ]; then printf '%s\n' "$_mc_e"; return 0; fi
+  done < "$1"
+  return 1
+}
+
+# copia_nuestra <manifiesto> <destino> <origen>: 0 si <destino> existe, no es un enlace y el
+# manifiesto lo anota como copia de <origen> (el contenido puede diferir).
+copia_nuestra() {
+  [ -e "$2" ] && [ ! -L "$2" ] || return 1
+  _cn=$(manifiesto_copia "$1" "$2") || return 1
+  [ "$_cn" = "$3" ]
+}
+
+# respaldar_copia_previa <ruta>: mueve una copia nuestra que se va a sustituir a
+# <respaldo>/p4-copias-previas/<ruta relativa a HOME> (uninstall no la restaura).
+respaldar_copia_previa() {
+  respaldo_dir || return 1
+  _rcp=${1#"$HOME"/}
+  mkdir -p "$RESPALDO/p4-copias-previas/$(dirname "$_rcp")" || return 1
+  mv "$1" "$RESPALDO/p4-copias-previas/$_rcp"
 }
 
 # settings_regenerar <repo> <os> <salida>: genera el settings.json que produciria el
