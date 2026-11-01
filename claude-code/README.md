@@ -27,6 +27,14 @@ Contenido actual:
 - Manifiesto: `~/.claude/.p4-manifest` (formato en `lib/common.sh`); lo leerán `uninstall` y `doctor`.
 - Repetir la instalación es seguro: cada paso es idempotente. `P4_FAIL_AFTER=<paso>` fuerza un fallo tras ese paso y existe solo para las pruebas.
 
+## Desinstalar y comprobar
+
+- `sh claude-code/uninstall.sh [--dry-run]` deshace la instalación leyendo `~/.claude/.p4-manifest`: quita solo los enlaces que siguen apuntando a este clon, restaura `settings.json` desde la copia del respaldo (sin copia, lo borra solo si es idéntico al generado; si no, lo deja y avisa), copia de vuelta lo que se movió al respaldo, quita `core.hooksPath` solo si lo fijó el instalador y conserva su valor, y quita las carpetas que creó si quedan vacías. Lo adoptado al repo no se borra del repo, el respaldo no se borra nunca, lo desconocido en `~/.claude` no se toca, y el manifiesto se quita al final.
+- Antes de cambiar nada comprueba todo: sale con 2 sin tocar nada si el manifiesto es incoherente (línea desconocida, enlace de otro clon, ruta fuera de `HOME`, respaldo ausente, destino de restauración ocupado). Sale con 1 y "nada instalado" si no hay manifiesto, así que repetirlo no hace nada. No anula el registro de los MCP: viven en `~/.claude.json`, que no se edita a mano; al terminar imprime los `claude mcp remove --scope user <nombre>` que hay que ejecutar.
+- `sh claude-code/doctor.sh` solo lee y sale con 0 si el equipo coincide con el repo, o con 1 listando cada `diferencia:`: enlaces que faltan, rotos, ajenos o convertidos en copia, `core.hooksPath`, `settings.json` distinto del regenerado con `merge-settings.mjs`, versiones de `versions.lock` y MCP de `mcp.json` ausentes en `claude mcp list`.
+- Versiones: `codebase-memory-mcp` se lee de `~/.local/bin/codebase-memory-mcp --version` (primer `X.Y.Z` de la salida) y los plugins de `~/.claude/plugins/installed_plugins.json` (`plugins.<id>[].version`). Si la fuente no existe (binario, archivo o `claude`) es un aviso en stderr, no una diferencia; un plugin ausente de un archivo que sí existe sí lo es.
+- Pruebas: `sh claude-code/tests/test-uninstall-doctor.sh` (también con `TEST_SH=dash`).
+
 Reglas del árbol: scripts en POSIX sh, sin rutas absolutas de usuario (usar `~` o `$HOME`), sin secretos, textos en español.
 
 Ejecutar las pruebas: `sh claude-code/tests/test-lint.sh`, `sh claude-code/tests/test-mcp.sh`, `sh claude-code/tests/test-install.sh` (también con `TEST_SH=dash`) y `node --test claude-code/tests/*.test.mjs`.

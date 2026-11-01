@@ -104,3 +104,47 @@ ruta_resuelta() {
   done
   printf '%s%s\n' "$(cd -P "$_r" && pwd -P)" "$_resto"
 }
+
+# detectar_os: fija OS (macos|linux) segun uname; devuelve 1 si no se soporta.
+detectar_os() {
+  case $(uname -s) in
+    Darwin) OS=macos ;;
+    Linux) OS=linux ;;
+    *) return 1 ;;
+  esac
+}
+
+# settings_regenerar <repo> <os> <salida>: genera el settings.json que produciria el
+# instalador (mismos --os, --home y machine.env). Sin machine.env usa machine.env.example
+# y deja SETTINGS_SIN_MACHINE=1. Devuelve el codigo de node.
+settings_regenerar() {
+  _sr_menv="$1/machine.env"; SETTINGS_SIN_MACHINE=0
+  if [ ! -f "$_sr_menv" ]; then _sr_menv="$1/machine.env.example"; SETTINGS_SIN_MACHINE=1; fi
+  node "$1/lib/merge-settings.mjs" --dir "$1" --os "$2" --machine "$_sr_menv" \
+    --home "$HOME" --out "$3"
+}
+
+# enlace_al_repo <ruta> <repo>: 0 si es un enlace cuyo destino (absoluto, o relativo
+# al enlace) queda dentro de <repo>.
+enlace_al_repo() {
+  [ -L "$1" ] || return 1
+  _er_t=$(readlink "$1") || return 1
+  case $_er_t in /*) ;; *) _er_t="$(dirname "$1")/$_er_t" ;; esac
+  case $_er_t in "$2"/*) return 0 ;; *) return 1 ;; esac
+}
+
+# pares_repo <repo> <claude_dir> <githooks_dir>: "destino<TAB>origen" de todo lo que el
+# instalador enlaza, segun lo que el repo contiene hoy (sin --adopt).
+pares_repo() {
+  printf '%s\t%s\n' "$2/CLAUDE.md" "$1/CLAUDE.md"
+  for _pr_sub in skills hooks themes; do
+    for _pr_o in "$1/$_pr_sub"/*; do
+      [ -e "$_pr_o" ] || continue
+      printf '%s\t%s\n' "$2/$_pr_sub/${_pr_o##*/}" "$_pr_o"
+    done
+  done
+  while IFS= read -r _pr_n; do
+    [ -n "$_pr_n" ] && printf '%s\t%s\n' "$3/$_pr_n" "$1/git-hooks/dispatch"
+  done < "$1/git-hooks/NAMES"
+  printf '%s\t%s\n' "$3/lib.sh" "$1/git-hooks/lib.sh"
+}
