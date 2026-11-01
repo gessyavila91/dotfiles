@@ -141,22 +141,11 @@ while IFS== read -r clave valor; do
   case $clave in
     ""|"#"*) continue ;;
     codebase-memory-mcp)
-      if [ ! -x "$BIN" ]; then
+      vers=$(version_binario "$BIN"); rc=$?
+      if [ "$rc" = 1 ]; then
         aviso "no se puede ejecutar $BIN; no se comprueba la version de $clave"
-      else
-        salida=$("$BIN" --version 2>&1 </dev/null | head -5)
-        # Primer X.Y.Z de cada linea ("... 0.9.0 (go1.22.3)" da 0.9.0).
-        vers=$(printf '%s\n' "$salida" | sed -n ':a
-s/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/
-t f
-s/^[^0-9]*[0-9][0-9]*//
-t a
-d
-:f
-p' | head -1)
-        if [ -z "$vers" ]; then aviso "$BIN --version no dio una version reconocible"
-        elif [ "$vers" != "$valor" ]; then dif "version de $clave: instalada $vers, versions.lock pide $valor"
-        fi
+      elif [ "$rc" = 2 ]; then aviso "$BIN --version no dio una version reconocible"
+      elif [ "$vers" != "$valor" ]; then dif "version de $clave: instalada $vers, versions.lock pide $valor"
       fi ;;
     plugin.*)
       id=${clave#plugin.}
@@ -164,12 +153,7 @@ p' | head -1)
         [ -n "${AVISO_PLUG:-}" ] || aviso "no existe $PLUG; no se comprueban las versiones de plugins"
         AVISO_PLUG=1
       else
-        inst=$(node -e '
-          const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-          const e = (j.plugins || {})[process.argv[2]];
-          if (e === undefined) process.exit(3);
-          const l = Array.isArray(e) ? e : [e];
-          console.log(l.map((x) => x.version).filter(Boolean).join(" "));' "$PLUG" "$id" 2>/dev/null)
+        inst=$(version_plugin "$PLUG" "$id")
         rc=$?
         if [ "$rc" = 3 ]; then dif "plugin $id: no esta instalado (versions.lock pide $valor)"
         elif [ "$rc" != 0 ]; then aviso "no se pudo leer $PLUG"

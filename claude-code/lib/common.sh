@@ -222,3 +222,43 @@ en_adopt_ignore() {
   done < "$1/adopt-ignore"
   return 1
 }
+
+# version_binario <ruta>: imprime la primera version X.Y.Z que da `<ruta> --version`.
+# Devuelve 1 si no es ejecutable y 2 si la salida no trae una version reconocible.
+# Lo usan doctor.sh y update-versions.sh (una sola implementacion).
+version_binario() {
+  [ -x "$1" ] || return 1
+  _vb_salida=$("$1" --version 2>&1 </dev/null | head -5)
+  # Primer X.Y.Z de cada linea ("... 0.9.0 (go1.22.3)" da 0.9.0).
+  _vb=$(printf '%s\n' "$_vb_salida" | sed -n ':a
+s/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/
+t f
+s/^[^0-9]*[0-9][0-9]*//
+t a
+d
+:f
+p' | head -1)
+  [ -n "$_vb" ] || return 2
+  printf '%s\n' "$_vb"
+}
+
+# version_plugin <installed_plugins.json> <id>: imprime las versiones instaladas de <id>
+# (plugins.<id>[].version) separadas por espacio. Devuelve 3 si <id> no esta en el
+# archivo y otro codigo distinto de 0 si no se pudo leer. Requiere node.
+version_plugin() {
+  node -e '
+    const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const e = (j.plugins || {})[process.argv[2]];
+    if (e === undefined) process.exit(3);
+    const l = Array.isArray(e) ? e : [e];
+    console.log(l.map((x) => x.version).filter(Boolean).join(" "));' "$1" "$2" 2>/dev/null
+}
+
+# plugins_habilitados <settings.json>: imprime, uno por linea, los <id> con
+# enabledPlugins.<id> === true. Devuelve distinto de 0 si no se pudo leer. Requiere node.
+plugins_habilitados() {
+  node -e '
+    const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const e = j.enabledPlugins || {};
+    for (const k of Object.keys(e)) if (e[k] === true) console.log(k);' "$1" 2>/dev/null
+}

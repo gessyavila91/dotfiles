@@ -10,6 +10,7 @@ Contenido actual:
 - `mcp.json`, `lib/mcp-register.sh`, `lib/mcp-helper.mjs`: lista de MCP de usuario y su registro. `mcp_register <mcp.json> <machine.env> <os>` (cargar con `.` y definir `MCP_REGISTER_DIR` con la ruta de `lib/`) llama a `claude mcp add-json --scope user <nombre> '<json>'`, sintaxis verificada con `claude mcp add-json --help`: el JSON va como un solo argumento, sin escapado extra en sh (el escapado en PowerShell sigue sin verificar). Es idempotente: pregunta con `claude mcp get <nombre>` y solo registra si falta o difiere (tipo, command, args o URL).
 - Rutas con `{{HOME}}` se resuelven al registrar. `phpstorm` y `pycharm` (`when: "ide"`, solo con `IDE_MCP=yes`) llevan `{{PHPSTORM_URL}}` y `{{PYCHARM_URL}}`, que se rellenan con las claves opcionales del mismo nombre de `machine.env` (el puerto lo fija el IDE y cambia por equipo); si falta una, ese MCP se omite con un aviso. `mcp.json` no lleva `env` ni `headers`.
 - `versions.lock`: versiones fijadas (`clave=valor`) de `codebase-memory-mcp` y de los plugins habilitados (`plugin.<id>=<versión>`).
+- `update-versions.sh`: reescribe `versions.lock` desde lo instalado (ver «Versiones fijadas»). `tests/test-update-versions.sh`: sus pruebas.
 - `tests/test-mcp.sh`: pruebas del registro con un `claude` falso.
 
 ## Instalar (macOS y Linux)
@@ -36,6 +37,17 @@ Contenido actual:
 - Versiones: `codebase-memory-mcp` se lee de `~/.local/bin/codebase-memory-mcp --version` (primer `X.Y.Z` de la salida) y los plugins de `~/.claude/plugins/installed_plugins.json` (`plugins.<id>[].version`). Si la fuente no existe (binario, archivo o `claude`) es un aviso en stderr, no una diferencia; un plugin ausente de un archivo que sí existe sí lo es.
 - Con varias instalaciones, la copia «última» de `settings.json` en el respaldo es la de la última instalación que respaldó algo, no necesariamente el original previo a la primera. Si `settings.json` ya era idéntico al generado al instalar, el manifiesto lo anota como `preexistente` y `uninstall` lo conserva. Dos respaldos con la misma ruta y contenido distinto hacen salir con 2 sin tocar nada.
 - Pruebas: `sh claude-code/tests/test-uninstall-doctor.sh` (también con `TEST_SH=dash`).
+
+## Versiones fijadas
+
+`versions.lock` fija (`clave=valor`, ordenado por clave) la versión de `codebase-memory-mcp` y la de cada plugin habilitado (`plugin.<id>@<marketplace>=<versión>`). Nada lo cambia solo: solo sube cuando usted lo pide.
+
+- Subir las versiones: `sh claude-code/update-versions.sh`. Lee lo instalado con las mismas funciones que `doctor` (`lib/common.sh`), incluye solo los plugins con `enabledPlugins` en `true` en `~/.claude/settings.json` y reescribe `versions.lock` de forma determinista (claves ordenadas, salto de línea final, vía archivo temporal). Luego revise la diferencia con `git diff claude-code/versions.lock` y haga commit.
+- `--dry-run` muestra la diferencia (`-` actual, `+` nueva) y no escribe nada. `--check` sale con 0 si el lock ya coincide con lo instalado y con 1 si no; tampoco escribe.
+- Si una fuente falta (binario, `installed_plugins.json`, `settings.json`, o un plugin habilitado que no está instalado) avisa y deja esa clave como estaba: nunca la borra en silencio. Un plugin deshabilitado sí sale del lock. Sin `node` sale con 3. Solo toca `versions.lock`.
+- `doctor` compara cada equipo con el lock y lista como `diferencia:` las versiones distintas, así que un equipo con otra versión se ve de inmediato; tras `update-versions.sh` en el mismo equipo no debe haber diferencias de versión.
+- Windows: no hace falta un `.ps1` nuevo; en Git Bash se ejecuta con `sh claude-code/update-versions.sh`, igual que en macOS y Linux.
+- Pruebas: `sh claude-code/tests/test-update-versions.sh` (también con `TEST_SH=dash`).
 
 ## Windows (modo copia)
 
