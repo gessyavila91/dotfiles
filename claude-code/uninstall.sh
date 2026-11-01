@@ -52,6 +52,11 @@ if [ ! -f "$MANIFEST" ]; then
 fi
 
 INCOH=0
+if _oc=$(manifiesto_otro_clon "$MANIFEST" "$REPO"); then
+  ayuda_otro_clon "$MANIFEST" "$REPO" "$_oc"
+  error "no se toca nada; ejecute uninstall.sh desde el clon antiguo"
+  exit 2
+fi
 incoherente() { error "estado incoherente: $*"; INCOH=1; }
 bajo_home() { case $1 in "$HOME"/*) return 0 ;; *) return 1 ;; esac; }
 

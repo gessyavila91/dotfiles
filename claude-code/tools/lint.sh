@@ -32,12 +32,12 @@ if find "$DIR" -type f -name '*.json' | grep . >/dev/null 2>&1; then
 fi
 
 # 2. Rutas literales de usuario
-if grep -rInE '/[U]sers/[^/<[:space:]$]|/[h]ome/[A-Za-z0-9_.-]+/' "$DIR"; then
+if grep -rInE '/[U]sers/[^/<[:space:]$]|/[h]ome/[A-Za-z0-9_.-]+/|[A-Za-z]:[\\/][U]sers[\\/][^\\/<[:space:]$]' "$DIR"; then
   echo "lint: ruta literal de usuario (usar ~ o \$HOME)"; BAD=1
 fi
 
 # 3. Cadenas con forma de secreto
-if grep -rInE '(^|[^A-Za-z0-9])s[k]-[A-Za-z0-9_-]{16,}|g[h]p_[A-Za-z0-9]{20,}|x[o]x[bp]-[A-Za-z0-9-]{10,}|A[K]IA[0-9A-Z]{16}|-----BEG[I]N' "$DIR"; then
+if grep -rInE '(^|[^A-Za-z0-9])s[k]-[A-Za-z0-9_-]{16,}|g[h]p_[A-Za-z0-9]{20,}|x[o]x[bp]-[A-Za-z0-9-]{10,}|g[i]thub_pat_[A-Za-z0-9_]{20,}|g[l]pat-[A-Za-z0-9_-]{16,}|A[K]IA[0-9A-Z]{16}|-----BEG[I]N' "$DIR"; then
   echo "lint: posible secreto"; BAD=1
 fi
 

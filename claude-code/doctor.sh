@@ -66,6 +66,11 @@ revisar_copia() {
   fi
 }
 
+# Instalacion de otro clon: un solo mensaje claro en vez de un enlace ajeno por entrada.
+if _oc=$(manifiesto_otro_clon "$MANIFEST" "$REPO"); then
+  dif "la instalacion es de otro clon (por ejemplo $_oc), no de $REPO; ejecute uninstall.sh desde el clon antiguo, copie machine.env y ejecute install.sh desde este"
+fi
+
 # --- enlaces -----------------------------------------------------------------
 # revisar_enlace <destino> <origen esperado o vacio>
 revisar_enlace() {

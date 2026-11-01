@@ -597,4 +597,20 @@ if [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] && [ "$igual1" -eq 1 ] && [ "$igual2" -eq 
 else ko "install_copy_mode_refuses_mixing_modes ($r1 $r2 $igual1 $igual2)"; cat "$TMP/err"; fi
 rm -rf "$TMP"
 
+# ---------------------------------------------------------------------------
+# install_refuses_manifest_from_another_clone: el manifiesto es del clon A; instalar desde B
+# sale con 2, no escribe nada y explica el procedimiento.
+nuevo_entorno
+instalar --non-interactive; r0=$RC
+CLON_A=$CLON; CLON_B="$TMP/clon2/claude-code"
+mkdir -p "$TMP/clon2"; cp -R "$ROOT" "$CLON_B"; rm -f "$CLON_B/machine.env"
+antes=$(huella "$CASA"; cat "$TMP/gitconfig"); antes_b=$(huella "$CLON_B")
+CLON=$CLON_B; instalar --non-interactive; r1=$RC; instalar --adopt --non-interactive; r2=$RC; CLON=$CLON_A
+if [ "$r0" -eq 0 ] && [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] \
+  && [ "$antes" = "$(huella "$CASA"; cat "$TMP/gitconfig")" ] && [ "$antes_b" = "$(huella "$CLON_B")" ] \
+  && grep -q 'otro clon' "$TMP/err" && grep -q 'uninstall.sh' "$TMP/err" && grep -q 'machine.env' "$TMP/err"; then
+  ok install_refuses_manifest_from_another_clone
+else ko "install_refuses_manifest_from_another_clone ($r0 $r1 $r2)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
 exit $FAIL

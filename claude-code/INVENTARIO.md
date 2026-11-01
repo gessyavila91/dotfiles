@@ -60,7 +60,7 @@ No tiene `node_modules`. `settings.json` lo invoca con la ruta absoluta de `hook
 ## Hallazgos para las tareas siguientes
 
 - `settings.json` contiene rutas absolutas del directorio personal en los hooks de ccdeck: hay que parametrizarlas.
-- Nada de lo externo se versiona; solo lo propio: skills `desatendido` y `estado`, hooks `estado-*` y `gitflow-guard*`, y `git/hooks`.
+- Se versiona lo propio (skills `desatendido` y `estado`, hooks `estado-*` y `gitflow-guard*`, y `git/hooks`) y, por decisión (Ruling 6), las skills externas `caveman`, `codebase-memory`, `find-skills`, `frontend-design`, `llm-council` y las `cbm-*`. El resto de lo externo (`synced/`, `.trash/`, plugins, `peon-ping`) no se versiona.
 - `agent-dag/` contiene un token de ejecución: debe quedar fuera del repositorio.
 
 ## Plantillas de settings (tarea 3)

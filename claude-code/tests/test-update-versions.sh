@@ -142,4 +142,15 @@ if [ "$d1" -ge 1 ] && [ "$d2" -eq 0 ]; then ok doctor_matches_update_versions
 else ko "doctor_matches_update_versions ($d1, $d2)"; cat "$TMP/dout" "$TMP/derr"; fi
 rm -rf "$TMP"
 
+# ---------------------------------------------------------------------------
+# update_versions_keeps_file_mode: el lock conserva su modo (no queda en 0600)
+nuevo_entorno
+chmod 664 "$CLON/versions.lock"
+actualizar; m1=$(ls -l "$CLON/versions.lock" | cut -c1-10)
+rm -f "$CLON/versions.lock"
+actualizar; m2=$(ls -l "$CLON/versions.lock" | cut -c1-10)
+if [ "$RC" -eq 0 ] && [ "$m1" = "-rw-rw-r--" ] && [ "$m2" = "-rw-r--r--" ]; then ok update_versions_keeps_file_mode
+else ko "update_versions_keeps_file_mode ($m1 $m2)"; fi
+rm -rf "$TMP"
+
 exit $FAIL

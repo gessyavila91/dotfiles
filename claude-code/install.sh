@@ -95,6 +95,12 @@ fi
 [ "$COPIA" = 1 ] && info "modo copia: se copian los archivos en vez de enlazarlos"
 paso requisitos
 
+# --- otro clon: si el manifiesto es de otro clon, no se escribe nada -------------
+if _oc=$(manifiesto_otro_clon "$CLAUDE_DIR/.p4-manifest" "$REPO"); then
+  ayuda_otro_clon "$CLAUDE_DIR/.p4-manifest" "$REPO" "$_oc"
+  exit 2
+fi
+
 # --- analisis: que enlazar y que conflictos hay (no escribe nada) ----------
 # pares: "destino<TAB>origen" de todo lo que se enlaza en ~/.claude/.
 pares() {

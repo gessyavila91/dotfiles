@@ -262,3 +262,23 @@ plugins_habilitados() {
     const e = j.enabledPlugins || {};
     for (const k of Object.keys(e)) if (e[k] === true) console.log(k);' "$1" 2>/dev/null
 }
+
+# manifiesto_otro_clon <manifiesto> <repo>: si alguna entrada link o copia del manifiesto
+# apunta fuera de <repo>, imprime ese origen y devuelve 0; si no, devuelve 1.
+manifiesto_otro_clon() {
+  [ -f "$1" ] || return 1
+  while IFS="$TAB" read -r _oc_k _oc_p _oc_e; do
+    case $_oc_k in link|copia) ;; *) continue ;; esac
+    case $_oc_e in "$2"/*) ;; *) printf '%s\n' "$_oc_e"; return 0 ;; esac
+  done < "$1"
+  return 1
+}
+
+# ayuda_otro_clon <manifiesto> <repo> <origen ajeno>: explica en stderr que la instalacion
+# es de otro clon y como cambiar de clon.
+ayuda_otro_clon() {
+  error "la instalacion anotada en $1 es de otro clon (por ejemplo $3); este clon es $2"
+  printf '%s\n' \
+    "  Para cambiar de clon: 1) ejecute uninstall.sh desde el clon antiguo;" \
+    "  2) copie claude-code/machine.env del clon antiguo al nuevo; 3) ejecute install.sh desde el nuevo." >&2
+}

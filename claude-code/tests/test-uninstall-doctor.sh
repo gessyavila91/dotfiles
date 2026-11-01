@@ -430,4 +430,23 @@ if [ "$r1" -eq 1 ] && printf '%s\n' "$o1" | grep -q 'CLAUDE.md.*difiere' \
 else ko "doctor_copy_mode_detects_edited_copy ($r1, $RC)"; printf '%s\n' "$o1"; cat "$TMP/out"; fi
 rm -rf "$TMP"
 
+# ---------------------------------------------------------------------------
+# uninstall_from_old_clone_still_works: tras negarse la instalacion desde otro clon, el
+# clon antiguo desinstala y despues el nuevo instala; doctor desde el nuevo avisa antes.
+nuevo_entorno
+instalar --non-interactive; r0=$RC
+CLON_A=$CLON; CLON_B="$TMP/clon2/claude-code"
+mkdir -p "$TMP/clon2"; cp -R "$ROOT" "$CLON_B"; rm -f "$CLON_B/machine.env"
+CLON=$CLON_B; instalar --non-interactive; r1=$RC
+doctor; rd=$RC; od=$(cat "$TMP/out")
+desinstalar; ru=$RC; eu=$(cat "$TMP/err")
+CLON=$CLON_A; desinstalar; r2=$RC
+CLON=$CLON_B; instalar --non-interactive; r3=$RC
+if [ "$r0" -eq 0 ] && [ "$r1" -eq 2 ] && [ "$rd" -eq 1 ] && printf '%s\n' "$od" | grep -q 'otro clon' \
+  && [ "$ru" -eq 2 ] && printf '%s\n' "$eu" | grep -q 'clon antiguo' \
+  && [ "$r2" -eq 0 ] && [ "$r3" -eq 0 ] && [ -L "$CASA/.claude/CLAUDE.md" ] \
+  && [ "$(readlink "$CASA/.claude/CLAUDE.md")" = "$CLON_B/CLAUDE.md" ]; then ok uninstall_from_old_clone_still_works
+else ko "uninstall_from_old_clone_still_works ($r0 $r1 $rd $ru $r2 $r3)"; printf '%s\n' "$od"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
 exit $FAIL

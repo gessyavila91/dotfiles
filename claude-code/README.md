@@ -26,7 +26,7 @@ Contenido actual:
 - Códigos de salida: 0 bien, 2 conflicto, 3 falta `node` o `git` (o el sistema no es macOS, Linux ni Windows con Git Bash), 1 otro fallo. Si falta `claude` o `docker`, solo avisa.
 - `--copy` (o `P4_COPY=1` en el entorno; en Windows siempre) instala en modo copia: ver la sección de Windows. Una instalación es de enlaces o de copias; para cambiar de modo hay que desinstalar antes (si no, sale con 2).
 - Al final registra los MCP con `mcp_register`. `--dry-run` muestra lo que haría sin escribir nada.
-- Manifiesto: `~/.claude/.p4-manifest` (formato en `lib/common.sh`); lo leerán `uninstall` y `doctor`.
+- Manifiesto: `~/.claude/.p4-manifest` (formato en `lib/common.sh`); lo leen `uninstall`, `doctor` y `install` (para reconocer lo suyo y negarse a instalar encima de otro clon).
 - Repetir la instalación es seguro: cada paso es idempotente. `P4_FAIL_AFTER=<paso>` fuerza un fallo tras ese paso y existe solo para las pruebas.
 
 ## Desinstalar y comprobar
@@ -36,11 +36,12 @@ Contenido actual:
 - `sh claude-code/doctor.sh` solo lee y sale con 0 si el equipo coincide con el repo, o con 1 listando cada `diferencia:`: enlaces que faltan, rotos, ajenos o convertidos en copia, `core.hooksPath`, `settings.json` distinto del regenerado con `merge-settings.mjs`, versiones de `versions.lock` y MCP de `mcp.json` ausentes en `claude mcp list`.
 - Versiones: `codebase-memory-mcp` se lee de `~/.local/bin/codebase-memory-mcp --version` (primer `X.Y.Z` de la salida) y los plugins de `~/.claude/plugins/installed_plugins.json` (`plugins.<id>[].version`). Si la fuente no existe (binario, archivo o `claude`) es un aviso en stderr, no una diferencia; un plugin ausente de un archivo que sí existe sí lo es.
 - Con varias instalaciones, la copia «última» de `settings.json` en el respaldo es la de la última instalación que respaldó algo, no necesariamente el original previo a la primera. Si `settings.json` ya era idéntico al generado al instalar, el manifiesto lo anota como `preexistente` y `uninstall` lo conserva. Dos respaldos con la misma ruta y contenido distinto hacen salir con 2 sin tocar nada.
+- Códigos de salida: `uninstall.sh` 0 bien, 1 nada instalado, 2 estado incoherente; `doctor.sh` 0 coincide, 1 hay diferencias, 3 falta `node`; `update-versions.sh` 3 si falta `node`.
 - Pruebas: `sh claude-code/tests/test-uninstall-doctor.sh` (también con `TEST_SH=dash`).
 
 ## Versiones fijadas
 
-`versions.lock` fija (`clave=valor`, ordenado por clave) la versión de `codebase-memory-mcp` y la de cada plugin habilitado (`plugin.<id>@<marketplace>=<versión>`). Nada lo cambia solo: solo sube cuando usted lo pide.
+`versions.lock` registra (`clave=valor`, ordenado por clave) la versión de `codebase-memory-mcp` y la de cada plugin habilitado (`plugin.<id>@<marketplace>=<versión>`). Es una referencia: `install.sh` no instala esas versiones; sirve para que `doctor` detecte deriva y para anotar a propósito lo que está instalado. Nada lo cambia solo: solo sube cuando usted lo pide.
 
 - Subir las versiones: `sh claude-code/update-versions.sh`. Lee lo instalado con las mismas funciones que `doctor` (`lib/common.sh`), incluye solo los plugins con `enabledPlugins` en `true` en `~/.claude/settings.json` y reescribe `versions.lock` de forma determinista (claves ordenadas, salto de línea final, vía archivo temporal). Luego revise la diferencia con `git diff claude-code/versions.lock` y haga commit.
 - `--dry-run` muestra la diferencia (`-` actual, `+` nueva) y no escribe nada. `--check` sale con 0 si el lock ya coincide con lo instalado y con 1 si no; tampoco escribe.
@@ -48,6 +49,20 @@ Contenido actual:
 - `doctor` compara cada equipo con el lock y lista como `diferencia:` las versiones distintas, así que un equipo con otra versión se ve de inmediato; tras `update-versions.sh` en el mismo equipo no debe haber diferencias de versión.
 - Windows: no hace falta un `.ps1` nuevo; en Git Bash se ejecuta con `sh claude-code/update-versions.sh`, igual que en macOS y Linux.
 - Pruebas: `sh claude-code/tests/test-update-versions.sh` (también con `TEST_SH=dash`).
+
+## Cambiar de clon / mover el worktree a ~/.config
+
+La instalación apunta al clon desde el que se ejecutó `install.sh`. Si se instala desde un worktree y luego se quiere pasar a otro clon (p. ej. `~/.config`), no se puede instalar encima: `install.sh` se niega con código 2 y sin escribir nada si el manifiesto es de otro clon, y `doctor.sh` lo señala como una sola diferencia. No borre el worktree antiguo antes de terminar, porque los enlaces apuntan a él. Procedimiento:
+
+1. Desde el clon antiguo: `sh claude-code/uninstall.sh` (`uninstall.sh` desde el clon nuevo también se niega, con código 2).
+2. Copie `claude-code/machine.env` del clon antiguo al nuevo.
+3. Desde el clon nuevo: `sh claude-code/install.sh`.
+4. Compruebe con `sh claude-code/doctor.sh`.
+
+## Limitaciones conocidas
+
+- `install.sh` no instala versiones: `versions.lock` es una referencia para detectar deriva (`doctor`) y para registrar a propósito lo que está instalado (`update-versions.sh`).
+- Una instalación pertenece a un solo clon; cambiar de clon exige el procedimiento anterior.
 
 ## Windows (modo copia)
 
@@ -79,4 +94,4 @@ Pendientes en la laptop, en este orden (nada de esto se ha probado):
 
 Reglas del árbol: scripts en POSIX sh, sin rutas absolutas de usuario (usar `~` o `$HOME`), sin secretos, textos en español.
 
-Ejecutar las pruebas: `sh claude-code/tests/test-lint.sh`, `sh claude-code/tests/test-content.sh`, `sh claude-code/tests/test-mcp.sh`, `sh claude-code/tests/test-install.sh` y `sh claude-code/tests/test-uninstall-doctor.sh` (ambas también con `TEST_SH=dash`) y `node --test claude-code/tests/*.test.mjs`.
+Ejecutar las pruebas: `sh claude-code/tests/test-lint.sh`, `sh claude-code/tests/test-content.sh`, `sh claude-code/tests/test-mcp.sh`, `sh claude-code/tests/test-install.sh`, `sh claude-code/tests/test-uninstall-doctor.sh` y `sh claude-code/tests/test-update-versions.sh` (las cinco `sh` también con `TEST_SH=dash`) y `node --test claude-code/tests/*.test.mjs`.

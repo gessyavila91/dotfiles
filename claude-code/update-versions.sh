@@ -125,6 +125,8 @@ case $MODO in
 esac
 if [ "$IGUAL" = 1 ]; then info "sin cambios: versions.lock ya coincide con lo instalado"; exit 0; fi
 LOCKTMP=$(mktemp "$LOCK.XXXXXX") || exit 1
+# mktemp crea 0600: conserva el modo del lock actual (o 0644 si no existe).
+if [ -f "$LOCK" ]; then cp -p "$LOCK" "$LOCKTMP" || exit 1; else chmod 644 "$LOCKTMP" || exit 1; fi
 cat "$NUEVO" > "$LOCKTMP" && mv "$LOCKTMP" "$LOCK" || exit 1
 LOCKTMP=
 info "versions.lock actualizado"
