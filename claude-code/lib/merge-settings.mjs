@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const SISTEMAS = ['macos', 'linux', 'windows'];
 const CLAVES_MAQUINA = { IDE_MCP: ['yes', 'no'] };
+// Claves opcionales: las lee mcp-register (URL de cada IDE); aqui solo se validan.
+const OPCIONALES_MAQUINA = ['PHPSTORM_URL', 'PYCHARM_URL'];
 
 function esObjeto(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -58,6 +60,11 @@ export function parseMachineEnv(text) {
     if (eq < 1) throw new Error(`machine.env linea ${i + 1}: formato invalido`);
     const clave = linea.slice(0, eq).trim();
     const valor = linea.slice(eq + 1).trim();
+    if (OPCIONALES_MAQUINA.includes(clave)) {
+      if (!/^https?:\/\/\S+$/.test(valor)) throw new Error(`machine.env: ${clave} debe ser una URL http(s) (recibido "${valor}")`);
+      out[clave] = valor;
+      continue;
+    }
     if (!(clave in CLAVES_MAQUINA)) throw new Error(`machine.env: clave desconocida ${clave}`);
     if (!CLAVES_MAQUINA[clave].includes(valor)) {
       throw new Error(`machine.env: ${clave} debe ser ${CLAVES_MAQUINA[clave].join('|')} (recibido "${valor}")`);

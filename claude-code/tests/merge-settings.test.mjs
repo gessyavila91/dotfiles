@@ -72,3 +72,9 @@ test('cli_writes_valid_json_and_never_a_symlink', () => {
   const bad = spawnSync('node', [SCRIPT, '--dir', cfg, '--os', 'amiga', '--machine', machine, '--home', home, '--out', out], { encoding: 'utf8' });
   assert.notEqual(bad.status, 0);
 });
+
+test('machine_env_accepts_optional_ide_urls', () => {
+  const o = parseMachineEnv('IDE_MCP=yes\nPHPSTORM_URL=http://127.0.0.1:1/stream\n');
+  assert.deepEqual(o, { IDE_MCP: 'yes', PHPSTORM_URL: 'http://127.0.0.1:1/stream' });
+  assert.throws(() => parseMachineEnv('IDE_MCP=yes\nPYCHARM_URL=nada'), /PYCHARM_URL/);
+});

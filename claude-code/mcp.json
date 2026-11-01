@@ -1,0 +1,22 @@
+[
+  {
+    "name": "codebase-memory-mcp",
+    "when": "always",
+    "config": { "type": "stdio", "command": "{{HOME}}/.local/bin/codebase-memory-mcp", "args": [] }
+  },
+  {
+    "name": "MCP_DOCKER",
+    "when": "always",
+    "config": { "type": "stdio", "command": "docker", "args": ["mcp", "gateway", "run"] }
+  },
+  {
+    "name": "phpstorm",
+    "when": "ide",
+    "config": { "type": "http", "url": "{{PHPSTORM_URL}}" }
+  },
+  {
+    "name": "pycharm",
+    "when": "ide",
+    "config": { "type": "http", "url": "{{PYCHARM_URL}}" }
+  }
+]
