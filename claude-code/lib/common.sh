@@ -93,3 +93,14 @@ respaldar_mover() {
   mkdir -p "$RESPALDO/$(dirname "$_rel")" || return 1
   mv "$1" "$RESPALDO/$_rel"
 }
+
+# ruta_resuelta <ruta>: ruta fisica (cd -P) de la carpeta existente mas cercana,
+# seguida del resto de la ruta que aun no existe.
+ruta_resuelta() {
+  _r=$1; _resto=
+  while [ ! -d "$_r" ]; do
+    _resto="/${_r##*/}$_resto"
+    _r=$(dirname "$_r")
+  done
+  printf '%s%s\n' "$(cd -P "$_r" && pwd -P)" "$_resto"
+}

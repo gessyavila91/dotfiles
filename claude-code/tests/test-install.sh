@@ -15,11 +15,12 @@ ko() { echo "FALLA $1"; FAIL=1; }
 nuevo_entorno() {
   TMP=$(mktemp -d) || exit 1
   TMP=$(cd "$TMP" && pwd -P) || exit 1
-  mkdir -p "$TMP/casa" "$TMP/bin" "$TMP/clon"
-  cp -R "$ROOT" "$TMP/clon/claude-code"
-  rm -f "$TMP/clon/claude-code/machine.env"
-  CLON="$TMP/clon/claude-code"
-  CASA="$TMP/casa"
+  # CON_ESPACIOS=1: HOME y clon con un espacio en la ruta.
+  if [ "${CON_ESPACIOS:-0}" = 1 ]; then CASA="$TMP/mi casa"; CLON="$TMP/el clon/claude-code"
+  else CASA="$TMP/casa"; CLON="$TMP/clon/claude-code"; fi
+  mkdir -p "$CASA" "$TMP/bin" "$(dirname "$CLON")"
+  cp -R "$ROOT" "$CLON"
+  rm -f "$CLON/machine.env"
   : > "$TMP/gitconfig"
   : > "$TMP/llamadas.log"
   cat > "$TMP/bin/claude" <<'FAKE'
@@ -281,6 +282,79 @@ if [ "$RC" -eq 0 ] && [ ! -L "$CASA/.config/git/hooks/pre-commit" ] && [ ! -e "$
   && grep -qi 'aviso' "$TMP/err"; then
   ok install_respects_foreign_git_hooks
 else ko "install_respects_foreign_git_hooks (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_refuses_parent_symlink_into_repo: ~/.claude/skills -> <clon>/skills
+# (como haria stow). Con y sin --adopt: salida 2 y repo y casa intactos.
+for modo in "" --adopt; do
+  nuevo_entorno
+  mkdir -p "$CASA/.claude"
+  ln -s "$CLON/skills" "$CASA/.claude/skills"
+  antes=$(estado_total)
+  instalar --non-interactive $modo
+  if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'mano' "$TMP/err"; then
+    ok "install_refuses_parent_symlink_into_repo ${modo:-sin-adopt}"
+  else ko "install_refuses_parent_symlink_into_repo ${modo:-sin-adopt} (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head; fi
+  rm -rf "$TMP"
+done
+
+# ---------------------------------------------------------------------------
+# install_refuses_parent_resolving_outside_home: ~/.claude -> fuera de HOME y
+# ~/.config/git -> fuera de HOME. Nada se escribe fuera.
+for caso in claude git; do
+  nuevo_entorno
+  mkdir -p "$TMP/fuera"
+  if [ "$caso" = claude ]; then ln -s "$TMP/fuera" "$CASA/.claude"
+  else mkdir -p "$CASA/.config"; ln -s "$TMP/fuera" "$CASA/.config/git"; fi
+  antes=$(estado_total; huella "$TMP/fuera")
+  instalar --non-interactive --adopt
+  if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total; huella "$TMP/fuera")" ]; then
+    ok "install_refuses_parent_resolving_outside_home $caso"
+  else ko "install_refuses_parent_resolving_outside_home $caso (rc=$RC)"; cat "$TMP/err" | head; fi
+  rm -rf "$TMP"
+done
+
+# ---------------------------------------------------------------------------
+# install_dry_run_adopt_changes_nothing
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/mia"
+echo "skill propia" > "$CASA/.claude/skills/mia/SKILL.md"
+cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+antes=$(estado_total)
+instalar --dry-run --adopt --non-interactive
+if [ "$RC" -eq 0 ] && [ "$antes" = "$(estado_total)" ] && [ ! -s "$TMP/llamadas.log" ] \
+  && grep -q 'simulacion: adoptar' "$TMP/out"; then
+  ok install_dry_run_adopt_changes_nothing
+else ko "install_dry_run_adopt_changes_nothing (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_handles_spaces_in_paths: HOME y clon con espacios; instala y es idempotente.
+CON_ESPACIOS=1 nuevo_entorno
+instalar --non-interactive
+rc1=$RC
+antes=$(estado_total)
+instalar --non-interactive
+if [ "$rc1" -eq 0 ] && [ "$RC" -eq 0 ] && [ "$antes" = "$(estado_total)" ] \
+  && es_enlace_a "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" \
+  && es_enlace_a "$CASA/.config/git/hooks/pre-push" "$CLON/git-hooks/dispatch" \
+  && node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(JSON.stringify(s).includes(process.argv[2])?0:1)' \
+       "$CASA/.claude/settings.json" "$CASA/"; then
+  ok install_handles_spaces_in_paths
+else ko "install_handles_spaces_in_paths (rc $rc1 $RC)"; cat "$TMP/err" | head; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_rejects_bad_home: HOME relativo o vacio -> 1, sin escribir.
+nuevo_entorno
+for h in "relativo" ""; do
+  ( cd "$TMP" && env HOME="$h" GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 PATH="$TMP/bin:$PATH" \
+      "$TEST_SH" "$CLON/install.sh" --non-interactive </dev/null >/dev/null 2>"$TMP/err" )
+  rc=$?
+  if [ "$rc" -eq 1 ] && [ ! -e "$TMP/relativo" ] && grep -q HOME "$TMP/err"; then ok "install_rejects_bad_home '$h'"
+  else ko "install_rejects_bad_home '$h' (rc=$rc)"; fi
+done
 rm -rf "$TMP"
 
 exit $FAIL

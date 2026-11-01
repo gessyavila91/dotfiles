@@ -3,8 +3,10 @@
 # POSIX sh. Uso: install.sh [--dry-run] [--adopt] [--non-interactive]
 #
 # Codigos de salida: 0 bien; 2 hay destinos ajenos (sin --adopt, o con --adopt y el
-# repo ya tiene una version distinta); 3 falta un requisito (node o git) o el sistema
-# no es macOS ni Linux; 1 cualquier otro fallo.
+# repo ya tiene una version distinta; o, con o sin --adopt, ~/.claude, sus carpetas
+# skills/hooks/themes o ~/.config/git/hooks son enlaces simbolicos o resuelven dentro
+# del clon o fuera de HOME); 3 falta un requisito (node o git) o el sistema
+# no es macOS ni Linux; 1 cualquier otro fallo (p. ej. HOME vacio o relativo).
 #
 # Pasos (cada uno idempotente; el manifiesto se anota por paso, asi que volver a
 # ejecutar tras una interrupcion converge al mismo estado):
@@ -25,6 +27,10 @@
 # P4_FAIL_AFTER=<paso> (SOLO PARA PRUEBAS): termina con 1 justo despues del paso
 # indicado, para comprobar que repetir la instalacion converge.
 
+case ${HOME:-} in
+  /*) [ -d "$HOME" ] || { echo "error: HOME no es una carpeta: $HOME" >&2; exit 1; } ;;
+  *) echo "error: HOME debe ser una ruta absoluta (vale '${HOME:-}')" >&2; exit 1 ;;
+esac
 SELF_DIR=$(cd "$(dirname "$0")" && pwd -P) || exit 1
 REPO=$SELF_DIR
 . "$REPO/lib/common.sh"
@@ -109,13 +115,31 @@ mostrar_diferencia() { # destino origen
 }
 
 CONFLICTO=0
-for c in "$CLAUDE_DIR" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/themes"; do
-  if [ -e "$c" ] && [ ! -d "$c" ]; then
-    error "$c existe y no es una carpeta; resuelvalo a mano"
-    CONFLICTO=1
+# Carpetas contenedoras: si alguna es un enlace simbolico, no es una carpeta, o resuelve
+# (cd -P, por un enlace en ella o en una carpeta de arriba) dentro del clon o fuera de
+# HOME, escribir en ella tocaria el repo o algo ajeno. Es conflicto incluso con --adopt.
+HOME_FISICO=$(cd -P "$HOME" && pwd -P) || { error "no se puede entrar en HOME ($HOME)"; exit 1; }
+for c in "$CLAUDE_DIR" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/hooks" "$CLAUDE_DIR/themes" "$GITHOOKS_DIR"; do
+  motivo=
+  if [ -L "$c" ]; then
+    motivo="es un enlace simbolico (a $(readlink "$c"))"
+  elif [ -e "$c" ] && [ ! -d "$c" ]; then
+    motivo="existe y no es una carpeta"
+  else
+    r=$(ruta_resuelta "$c")
+    case $r in
+      "$REPO"|"$REPO"/*) motivo="resuelve dentro del clon ($r)" ;;
+      "$HOME_FISICO"/*) ;;
+      *) motivo="resuelve fuera de HOME ($r)" ;;
+    esac
+  fi
+  if [ -n "$motivo" ]; then
+    error "$c $motivo; resuelvalo a mano (--adopt no lo arregla)"
+    CONFLICTO=2
   fi
 done
-LISTA=$(pares)
+LISTA=
+[ "$CONFLICTO" = 0 ] && LISTA=$(pares)
 while IFS="$TAB" read -r dest orig; do
   [ -n "$dest" ] || continue
   if es_nuestro "$dest" "$orig"; then
@@ -138,6 +162,10 @@ while IFS="$TAB" read -r dest orig; do
 done <<EOF
 $LISTA
 EOF
+if [ "$CONFLICTO" = 2 ]; then
+  error "hay carpetas de destino que no son carpetas normales dentro de HOME; no se toca nada"
+  exit 2
+fi
 if [ "$CONFLICTO" = 1 ]; then
   if [ "$ADOPT" = 1 ]; then
     error "hay destinos distintos de la version del repo; unifique el contenido y repita"
@@ -230,8 +258,10 @@ else
   case $actual in "~/"*) actual="$HOME/${actual#"~/"}" ;; esac
   if [ -z "$actual" ]; then
     if hacer "git config --global core.hooksPath $GITHOOKS_DIR"; then
-      git config --global core.hooksPath "$GITHOOKS_DIR" || { error "no se pudo fijar core.hooksPath"; exit 1; }
+      # Se anota antes de cambiarlo: si se corta entre ambos, uninstall lo deshace igual
+      # (quitar una clave que no existe no hace dano).
       manifiesto_add "gitconfig${TAB}core.hooksPath$TAB$GITHOOKS_DIR"
+      git config --global core.hooksPath "$GITHOOKS_DIR" || { error "no se pudo fijar core.hooksPath"; exit 1; }
     fi
   elif [ "$actual" != "$GITHOOKS_DIR" ]; then
     aviso "core.hooksPath ya vale '$actual'; no se cambia (los hooks de $GITHOOKS_DIR no se usaran)"
