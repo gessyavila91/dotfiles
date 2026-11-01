@@ -9,6 +9,13 @@ FAIL=0
 
 # comparar <copia> <origen>
 comparar() {
+  # Unica diferencia permitida: el origen puede traer el home literal; la copia usa $HOME.
+  if [ -f "$2" ] && grep -qF "$HOME/" "$2"; then
+    _t=$(mktemp)
+    sed "s|$HOME/|\$HOME/|g" "$2" > "$_t"
+    chmod --reference="$2" "$_t" 2>/dev/null || { [ -x "$2" ] && chmod +x "$_t"; }
+    set -- "$1" "$_t" "$2"
+  fi
   if [ ! -e "$2" ]; then
     echo "AVISO origen ausente, se omite: $2"
     return
@@ -19,7 +26,7 @@ comparar() {
   if ! cmp -s "$1" "$2"; then
     echo "FALLA difiere: $1"; FAIL=1
   fi
-  if [ -x "$2" ] && [ ! -x "$1" ]; then
+  if [ -x "${3:-$2}" ] && [ ! -x "$1" ]; then
     echo "FALLA sin bit ejecutable: $1"; FAIL=1
   fi
 }
@@ -34,7 +41,7 @@ comparar "$ROOT/skills/codebase-memory/SKILL.md" "$CLAUDE/skills/codebase-memory
 comparar "$ROOT/skills/find-skills/SKILL.md" "$CLAUDE/skills/find-skills/SKILL.md"
 for f in SKILL.md LICENSE.txt; do comparar "$ROOT/skills/frontend-design/$f" "$AGENTS/frontend-design/$f"; done
 for f in SKILL.md README.md; do comparar "$ROOT/skills/llm-council/$f" "$AGENTS/llm-council/$f"; done
-for f in cbm-session-reminder cbm-subagent-reminder estado-guard.sh estado-lib.sh estado-session.sh gitflow-guard.sh gitflow-guard-lib.sh; do
+for f in cbm-code-discovery-gate cbm-session-reminder cbm-subagent-reminder estado-guard.sh estado-lib.sh estado-session.sh gitflow-guard.sh gitflow-guard-lib.sh; do
   comparar "$ROOT/hooks/$f" "$CLAUDE/hooks/$f"
 done
 comparar "$ROOT/git-hooks/dispatch" "$GITHOOKS/dispatch"
@@ -51,7 +58,6 @@ if [ -d "$GITHOOKS" ]; then
 fi
 [ "$(grep -c . "$ROOT/git-hooks/NAMES" 2>/dev/null)" = 14 ] || { echo "FALLA NAMES no tiene 14 nombres"; FAIL=1; }
 
-# cbm-code-discovery-gate no se copia: contiene la ruta literal del usuario (pendiente de decision)
 # nunca copiar estado ni tokens de agent-dag
 if [ -e "$ROOT/agent-dag" ]; then echo "FALLA agent-dag no debe versionarse"; FAIL=1; fi
 [ "$FAIL" -eq 0 ] && echo "ok   content_matches_real_claude"

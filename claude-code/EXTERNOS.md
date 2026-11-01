@@ -19,4 +19,4 @@ Reinstalación:
 
 ## cbm-code-discovery-gate
 
-Hook de codebase-memory-mcp (lo instala esa herramienta). No se copia porque su línea 6 contiene la ruta literal del directorio personal y `tools/lint.sh` la rechaza. Pendiente: reinstalar con la herramienta o decidir una parametrización.
+Hook de codebase-memory-mcp, sí versionado. Única diferencia con el origen: la ruta del binario se parametriza como `$HOME/.local/bin/codebase-memory-mcp` en vez de la ruta literal del directorio personal, y la prueba lo compara tras esa sustitución.
