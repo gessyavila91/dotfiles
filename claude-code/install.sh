@@ -273,8 +273,10 @@ paso githooks
 node "$REPO/lib/merge-settings.mjs" --dir "$REPO" --os "$OS" --machine "$MENV" \
   --home "$HOME" --out "$SET_TMP" || { error "no se pudo generar settings.json"; exit 1; }
 SET="$CLAUDE_DIR/settings.json"
+SET_PREEX=0
 if [ -f "$SET" ] && [ ! -L "$SET" ] && cmp -s "$SET_TMP" "$SET"; then
   info "settings.json al dia"
+  SET_PREEX=1
 else
   if [ -e "$SET" ] || [ -L "$SET" ]; then
     if hacer "respaldar settings.json actual como settings.json.p4-bak-$TS"; then
@@ -286,11 +288,17 @@ else
   fi
   asegurar_dir "$CLAUDE_DIR" || { error "no se pudo crear $CLAUDE_DIR"; exit 1; }
   if hacer "generar $SET"; then
+    # Se anota antes de escribir: si se corta, repetir no lo toma por preexistente.
+    manifiesto_add "settings$TAB$SET${TAB}generado"
     cp "$SET_TMP" "$CLAUDE_DIR/.settings.json.p4-nuevo" \
       && mv -f "$CLAUDE_DIR/.settings.json.p4-nuevo" "$SET" || { error "no se pudo escribir $SET"; exit 1; }
   fi
 fi
-manifiesto_add "settings$TAB$SET${TAB}generado"
+# Ya identico al generado y sin linea previa en el manifiesto: lo tenia la usuaria
+# (o una instalacion anterior sin manifiesto); uninstall no lo borra.
+if [ "$SET_PREEX" = 1 ] && ! { [ -f "$CLAUDE_DIR/.p4-manifest" ] && grep -q "^settings$TAB" "$CLAUDE_DIR/.p4-manifest"; }; then
+  manifiesto_add "settings$TAB$SET${TAB}preexistente"
+fi
 paso settings
 
 # --- MCP -------------------------------------------------------------------

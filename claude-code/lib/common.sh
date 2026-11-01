@@ -13,7 +13,9 @@
 #   dir       carpeta creada por el instalador (extra vacio). Se anota la carpeta
 #             mas externa primero; uninstall la quita solo si queda vacia.
 #   link      enlace simbolico creado; extra = destino (archivo del clon).
-#   settings  settings.json generado (archivo normal, nunca enlace); extra = "generado".
+#   settings  settings.json (archivo normal, nunca enlace); extra = "generado" (lo escribio el
+#             instalador) o "preexistente" (ya existia identico al generado; uninstall no
+#             lo borra). Una sola linea: la primera instalacion decide.
 #   gitconfig clave de git global fijada por el instalador; path = clave
 #             (core.hooksPath), extra = valor.
 #   adopt     archivo o carpeta copiado al clon con --adopt; path = ruta en el clon,

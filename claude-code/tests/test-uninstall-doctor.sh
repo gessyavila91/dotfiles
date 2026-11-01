@@ -207,7 +207,7 @@ printf '#!/bin/sh\necho "codebase-memory-mcp 0.8.0"\n' > "$CASA/.local/bin/codeb
 chmod +x "$CASA/.local/bin/codebase-memory-mcp"
 doctor
 r1=$RC; g1=$(grep -c 'codebase-memory-mcp' "$TMP/out")
-printf '#!/bin/sh\necho "codebase-memory-mcp 0.9.0"\n' > "$CASA/.local/bin/codebase-memory-mcp"
+printf '#!/bin/sh\necho "codebase-memory-mcp 0.9.0 (go1.22.3)"\n' > "$CASA/.local/bin/codebase-memory-mcp"
 cat > "$CASA/.claude/plugins/installed_plugins.json" <<'JSON'
 {"version":2,"plugins":{
  "gitkraken-hooks@gitkraken":[{"version":"3.1.71"}],
@@ -247,6 +247,75 @@ b=$(estado_total)
 doctor; r2=$RC
 if [ "$r1" -eq 0 ] && [ "$r2" -eq 1 ] && [ "$b" = "$(estado_total)" ] && [ "$a" != "$b" ]; then ok doctor_is_read_only
 else ko "doctor_is_read_only ($r1, $r2)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# uninstall_keeps_preexisting_identical_settings: ya era identico al generado -> se conserva
+nuevo_entorno
+instalar --non-interactive
+cp "$CASA/.claude/settings.json" "$TMP/s.json"
+desinstalar
+mkdir -p "$CASA/.claude"; cp "$TMP/s.json" "$CASA/.claude/settings.json"
+instalar --non-interactive
+grep -q "^settings	$CASA/.claude/settings.json	preexistente\$" "$CASA/.claude/.p4-manifest"; m=$?
+instalar --non-interactive
+grep -c '^settings	' "$CASA/.claude/.p4-manifest" | grep -qx 1; m2=$?
+desinstalar
+if [ "$m" -eq 0 ] && [ "$m2" -eq 0 ] && [ "$RC" -eq 0 ] && cmp -s "$TMP/s.json" "$CASA/.claude/settings.json" \
+   && grep -q 'se conserva' "$TMP/out"; then ok uninstall_keeps_preexisting_identical_settings
+else ko "uninstall_keeps_preexisting_identical_settings ($m, $m2, $RC)"; cat "$TMP/out" "$TMP/err"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# uninstall_duplicate_backup_paths_exit_2: misma ruta en dos respaldos con contenido distinto
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/propia"; echo v1 > "$CASA/.claude/skills/propia/SKILL.md"
+instalar --adopt --non-interactive
+B2="$CASA/Respaldos/p4-20990101-000000-AAAAAA"
+mkdir -p "$B2/.claude/skills/propia"; echo v2 > "$B2/.claude/skills/propia/SKILL.md"
+echo "backup=$B2" >> "$CASA/.claude/.p4-manifest"
+a=$(estado_total)
+desinstalar
+if [ "$RC" -eq 2 ] && [ "$a" = "$(estado_total)" ] && [ -f "$CASA/.claude/.p4-manifest" ] && grep -q 'dos respaldos' "$TMP/err"; then ok uninstall_duplicate_backup_paths_exit_2
+else ko "uninstall_duplicate_backup_paths_exit_2 ($RC)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# uninstall_warns_settings_changes y settings borrado a mano
+nuevo_entorno
+mkdir -p "$CASA/.claude"; echo '{"a":1}' > "$CASA/.claude/settings.json"
+instalar --non-interactive
+echo '{"cambiado":1}' > "$CASA/.claude/settings.json"
+desinstalar
+r1=$RC
+bien=1
+[ "$(cat "$CASA/.claude/settings.json")" = '{"a":1}' ] || { bien=0; echo "  no se restauro"; }
+grep -q 'resumen de avisos' "$TMP/out" && grep -q 'cambios posteriores' "$TMP/out" || { bien=0; echo "  sin resumen"; }
+ls "$CASA"/Respaldos/p4-*/settings.json.p4-previo-* >/dev/null 2>&1 || { bien=0; echo "  sin copia previa"; }
+rm -rf "$TMP"
+nuevo_entorno
+mkdir -p "$CASA/.claude"; echo '{"a":1}' > "$CASA/.claude/settings.json"
+instalar --non-interactive
+rm -f "$CASA/.claude/settings.json"
+desinstalar
+[ "$RC" -eq 0 ] && [ ! -e "$CASA/.claude/settings.json" ] && grep -q 'no se restaura en silencio' "$TMP/out" || { bien=0; echo "  ausente ($RC)"; cat "$TMP/out"; }
+[ "$r1" -eq 0 ] && [ "$bien" -eq 1 ] && ok uninstall_warns_settings_changes || ko "uninstall_warns_settings_changes ($r1)"
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# doctor_compares_mcp_names_literally: "mi.mcp" no coincide con "miXmcp"
+nuevo_entorno
+node -e '
+  const fs = require("fs"); const f = process.argv[1];
+  const l = JSON.parse(fs.readFileSync(f, "utf8"));
+  l.push({ name: "mi.mcp", when: "always", config: { type: "stdio", command: "true", args: [] } });
+  fs.writeFileSync(f, JSON.stringify(l, null, 2) + "\n");' "$CLON/mcp.json"
+instalar --non-interactive
+doctor; r0=$RC
+rm -f "$TMP/mcp/mi.mcp"; : > "$TMP/mcp/miXmcp"
+doctor
+if [ "$r0" -eq 0 ] && [ "$RC" -eq 1 ] && grep -q "mi.mcp" "$TMP/out"; then ok doctor_compares_mcp_names_literally
+else ko "doctor_compares_mcp_names_literally ($r0, $RC)"; cat "$TMP/out"; fi
 rm -rf "$TMP"
 
 exit $FAIL

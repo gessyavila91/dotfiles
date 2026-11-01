@@ -53,7 +53,7 @@ incoherente() { error "estado incoherente: $*"; INCOH=1; }
 bajo_home() { case $1 in "$HOME"/*) return 0 ;; *) return 1 ;; esac; }
 
 # --- lectura y validacion del manifiesto -------------------------------------
-BACKUPS=; DIRS=; SETTINGS=; GITCFG_VAL=; HAY_GITCFG=0
+BACKUPS=; DIRS=; SETTINGS=; SET_EXTRA=; GITCFG_VAL=; HAY_GITCFG=0
 while IFS="$TAB" read -r kind ruta extra; do
   [ -n "$kind$ruta" ] || continue
   case $kind in
@@ -68,7 +68,7 @@ while IFS="$TAB" read -r kind ruta extra; do
     link)
       bajo_home "$ruta" || incoherente "enlace fuera de HOME: $ruta"
       case $extra in "$REPO"/*) ;; *) incoherente "$ruta apunta a $extra, que no es de este clon ($REPO)" ;; esac ;;
-    settings) bajo_home "$ruta" || incoherente "settings fuera de HOME: $ruta"; SETTINGS=$ruta ;;
+    settings) bajo_home "$ruta" || incoherente "settings fuera de HOME: $ruta"; SETTINGS=$ruta; SET_EXTRA=$extra ;;
     gitconfig) HAY_GITCFG=1; GITCFG_VAL=$extra ;;
     adopt) ;;
     *) incoherente "linea desconocida en el manifiesto: $kind" ;;
@@ -83,7 +83,7 @@ done < "$MANIFEST"
 # destino ocupado es incoherencia. En la raiz del respaldo, settings.json.p4-* no son
 # rutas de HOME y se saltan.
 restaurar_todo() {
-  COLA=
+  COLA=; VISTOS=
   while IFS= read -r _b; do
     [ -n "$_b" ] || continue
     for _x in "$_b"/* "$_b"/.[!.]*; do
@@ -103,6 +103,25 @@ EOF
         COLA="$COLA$_e$TAB$_d/${_e##*/}$NL"
       done
       continue
+    fi
+    if [ "$1" = comprobar ]; then
+      # Dos respaldos con la misma ruta (o una dentro de la otra) y contenido distinto:
+      # no se adivina cual vale.
+      while IFS="$TAB" read -r _vo _vd; do
+        [ -n "$_vd" ] || continue
+        if [ "$_vd" = "$_d" ]; then
+          if { [ -L "$_vo" ] && [ -L "$_o" ] && [ "$(readlink "$_vo")" = "$(readlink "$_o")" ]; } \
+             || { [ ! -L "$_vo" ] && [ ! -L "$_o" ] && mismo_contenido "$_vo" "$_o"; }; then :
+          else incoherente "$_d esta en dos respaldos con contenido distinto ($_vo y $_o)"
+          fi
+        else
+          case $_vd/ in "$_d"/*) incoherente "$_d y $_vd estan en respaldos distintos y se pisarian" ;; esac
+          case $_d/ in "$_vd"/*) incoherente "$_d y $_vd estan en respaldos distintos y se pisarian" ;; esac
+        fi
+      done <<EOF
+$VISTOS
+EOF
+      VISTOS="$VISTOS$_o$TAB$_d$NL"
     fi
     if [ -e "$_d" ] || [ -L "$_d" ]; then
       if enlace_al_repo "$_d" "$REPO"; then
@@ -125,8 +144,10 @@ EOF
 
 # --- settings.json: de que copia se restaura, o si se puede borrar -----------
 SET_BAK=; SET_ACCION=nada; SET_TMP=$(mktemp) || exit 1
+AVISOS=
 trap 'rm -f "$SET_TMP"' EXIT
-if [ -n "$SETTINGS" ] && { [ -e "$SETTINGS" ] || [ -L "$SETTINGS" ]; } && [ ! -L "$SETTINGS" ]; then
+aviso_final() { aviso "$*"; AVISOS="$AVISOS$*$NL"; }
+if [ -n "$SETTINGS" ]; then
   while IFS= read -r _b; do
     [ -n "$_b" ] || continue
     for _x in "$_b"/settings.json.p4-bak-*; do
@@ -135,8 +156,14 @@ if [ -n "$SETTINGS" ] && { [ -e "$SETTINGS" ] || [ -L "$SETTINGS" ]; } && [ ! -L
   done <<EOF
 $BACKUPS
 EOF
-  if [ -n "$SET_BAK" ]; then
+  if [ ! -e "$SETTINGS" ] && [ ! -L "$SETTINGS" ]; then
+    SET_ACCION=ausente
+  elif [ -L "$SETTINGS" ]; then
+    SET_ACCION=dejar
+  elif [ -n "$SET_BAK" ]; then
     SET_ACCION=restaurar
+  elif [ "$SET_EXTRA" = preexistente ]; then
+    SET_ACCION=conservar
   elif settings_regenerar "$REPO" "$OS" "$SET_TMP" 2>/dev/null && cmp -s "$SET_TMP" "$SETTINGS"; then
     SET_ACCION=borrar
   else
@@ -170,6 +197,7 @@ case $SET_ACCION in
       _prev=$(dirname "$SET_BAK")/settings.json.p4-previo-$TS
       if hacer "guardar el settings.json actual en $_prev"; then
         cp -p "$SETTINGS" "$_prev" || { error "no se pudo guardar $SETTINGS"; exit 1; }
+        aviso_final "$SETTINGS tenia cambios posteriores a la instalacion; se guardo como $_prev"
       fi
     fi
     if hacer "restaurar $SETTINGS desde $SET_BAK"; then
@@ -179,11 +207,20 @@ case $SET_ACCION in
     fi ;;
   borrar)
     if hacer "quitar $SETTINGS (identico al generado)"; then rm -f "$SETTINGS"; fi ;;
-  dejar) aviso "$SETTINGS difiere del generado y no hay copia en el respaldo; se deja como esta" ;;
+  conservar) info "$SETTINGS ya existia antes de instalar (identico al generado); se conserva" ;;
+  ausente)
+    if [ -n "$SET_BAK" ]; then
+      aviso_final "$SETTINGS no existe pero hay una copia en $SET_BAK; no se restaura en silencio. Para recuperarla: cp -p '$SET_BAK' '$SETTINGS'"
+    fi ;;
+  dejar) aviso_final "$SETTINGS difiere del generado y no hay copia en el respaldo (o no es un archivo normal); se deja como esta" ;;
 esac
 
 # --- 3. originales movidos al respaldo ---------------------------------------
 restaurar_todo hacer
+if [ "$INCOH" = 1 ]; then
+  error "la restauracion encontro un conflicto; se conserva el manifiesto $MANIFEST. Revise y repita"
+  exit 2
+fi
 
 # --- 4. core.hooksPath --------------------------------------------------------
 if [ "$HAY_GITCFG" = 1 ]; then
@@ -221,5 +258,9 @@ info "los MCP siguen registrados (viven en ~/.claude.json, que no se edita a man
 node -e '
   for (const e of JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")))
     console.log("  claude mcp remove --scope user " + e.name);' "$REPO/mcp.json" 2>/dev/null
+if [ -n "$AVISOS" ]; then
+  info "resumen de avisos:"
+  printf '%s' "$AVISOS" | sed 's/^/  - /'
+fi
 [ "$DRY" = 1 ] || info "desinstalado; los respaldos en ~/Respaldos no se borran"
 exit 0

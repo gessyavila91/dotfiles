@@ -107,7 +107,15 @@ while IFS== read -r clave valor; do
         aviso "no se puede ejecutar $BIN; no se comprueba la version de $clave"
       else
         salida=$("$BIN" --version 2>&1 </dev/null | head -5)
-        vers=$(printf '%s\n' "$salida" | sed -n 's/.*[^0-9.]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p;s/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1)
+        # Primer X.Y.Z de cada linea ("... 0.9.0 (go1.22.3)" da 0.9.0).
+        vers=$(printf '%s\n' "$salida" | sed -n ':a
+s/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*$/\1/
+t f
+s/^[^0-9]*[0-9][0-9]*//
+t a
+d
+:f
+p' | head -1)
         if [ -z "$vers" ]; then aviso "$BIN --version no dio una version reconocible"
         elif [ "$vers" != "$valor" ]; then dif "version de $clave: instalada $vers, versions.lock pide $valor"
         fi
@@ -137,6 +145,15 @@ while IFS== read -r clave valor; do
 done < "$REPO/versions.lock"
 
 # --- MCP registrados ------------------------------------------------------------
+# tiene_mcp <nombre>: 0 si alguna linea de $lista empieza por "nombre:" (comparacion literal).
+tiene_mcp() {
+  while IFS= read -r _l; do
+    case $_l in "$1":*) return 0 ;; esac
+  done <<EOF
+$lista
+EOF
+  return 1
+}
 MENV="$REPO/machine.env"; [ -f "$MENV" ] || MENV="$REPO/machine.env.example"
 if ! command -v claude >/dev/null 2>&1; then
   aviso "no se encontro 'claude'; no se comprueban los MCP"
@@ -146,7 +163,7 @@ else
   esperados=$(node "$REPO/lib/mcp-helper.mjs" plan "$REPO/mcp.json" "$MENV" "$HOME" 2>/dev/null | cut -f1)
   while IFS= read -r n; do
     [ -n "$n" ] || continue
-    printf '%s\n' "$lista" | grep -q "^$n:" || dif "MCP '$n' no esta registrado (claude mcp list)"
+    tiene_mcp "$n" || dif "MCP '$n' no esta registrado (claude mcp list)"
   done <<EOF
 $esperados
 EOF
