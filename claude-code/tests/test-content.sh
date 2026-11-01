@@ -6,13 +6,14 @@ CLAUDE=${CLAUDE_HOME:-$HOME/.claude}
 GITHOOKS=${GITHOOKS_HOME:-$HOME/.config/git/hooks}
 AGENTS=${AGENTS_HOME:-$HOME/.agents/skills}
 FAIL=0
+. "$ROOT/lib/common.sh"
 
 # comparar <copia> <origen>
 comparar() {
   # Unica diferencia permitida: el origen puede traer el home literal; la copia usa $HOME.
   if [ -f "$2" ] && grep -qF "$HOME/" "$2"; then
     _t=$(mktemp)
-    sed "s|$HOME/|\$HOME/|g" "$2" > "$_t"
+    normalizar_home "$2" > "$_t"
     chmod --reference="$2" "$_t" 2>/dev/null || { [ -x "$2" ] && chmod +x "$_t"; }
     set -- "$1" "$_t" "$2"
   fi

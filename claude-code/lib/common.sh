@@ -150,3 +150,28 @@ pares_repo() {
   done < "$1/git-hooks/NAMES"
   printf '%s\t%s\n' "$3/lib.sh" "$1/git-hooks/lib.sh"
 }
+
+# normalizar_home <archivo>: imprime el archivo cambiando cada "<HOME>/" literal (el
+# home real de esta ejecucion) por la cadena "$HOME/". Es la misma normalizacion que
+# usa tests/test-content.sh para comparar la copia del repo con el original.
+normalizar_home() {
+  _h=$(printf '%s\n' "$HOME" | sed 's/[][\.*^$|]/\\&/g')
+  sed "s|$_h/|\$HOME/|g" "$1"
+}
+
+# equivalente_home <destino> <origen>: 0 si destino y origen (archivos o carpetas)
+# solo difieren en que el destino lleva el home literal donde el origen lleva "$HOME/".
+# Las demas diferencias (incluidos archivos de mas o de menos) no son equivalentes.
+equivalente_home() {
+  [ -e "$1" ] && [ -e "$2" ] || return 1
+  _eq=$(mktemp -d) || return 1
+  if [ -d "$1" ]; then cp -R "$1" "$_eq/x" || { rm -rf "$_eq"; return 1; }
+  else cp "$1" "$_eq/x" || { rm -rf "$_eq"; return 1; }
+  fi
+  find "$_eq/x" -type f | while IFS= read -r _f; do
+    normalizar_home "$_f" > "$_f.p4n" && mv "$_f.p4n" "$_f"
+  done
+  diff -r "$_eq/x" "$2" >/dev/null 2>&1; _rc=$?
+  rm -rf "$_eq"
+  return $_rc
+}

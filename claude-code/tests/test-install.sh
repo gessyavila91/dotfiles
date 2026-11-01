@@ -357,4 +357,51 @@ for h in "relativo" ""; do
 done
 rm -rf "$TMP"
 
+# ---------------------------------------------------------------------------
+# Destino que solo difiere en el home literal (BIN= de cbm-code-discovery-gate).
+# con_home_literal <destino>: copia del hook del repo con "$HOME/" -> home real.
+con_home_literal() {
+  mkdir -p "$CASA/.claude/hooks"
+  sed "s|\$HOME/|$CASA/|g" "$CLON/hooks/cbm-code-discovery-gate" > "$1"
+  chmod +x "$1"
+  cmp -s "$1" "$CLON/hooks/cbm-code-discovery-gate" && ko "preparacion: el hook no lleva \$HOME/"
+}
+G=.claude/hooks/cbm-code-discovery-gate
+
+# install_adopt_treats_home_literal_as_equivalent
+nuevo_entorno
+con_home_literal "$CASA/$G"
+cp "$CASA/$G" "$TMP/original"
+repo_antes=$(huella "$CLON")
+instalar --adopt --non-interactive
+r=$(respaldos)
+if [ "$RC" -eq 0 ] && es_enlace_a "$CASA/$G" "$CLON/hooks/cbm-code-discovery-gate" \
+  && cmp -s "$r/$G" "$TMP/original" \
+  && [ "$repo_antes" = "$(huella "$CLON" | grep -v '^F \./machine\.env ')" ]; then
+  ok install_adopt_treats_home_literal_as_equivalent
+else ko "install_adopt_treats_home_literal_as_equivalent (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head; fi
+rm -rf "$TMP"
+
+# install_home_literal_difference_conflicts_without_adopt
+nuevo_entorno
+con_home_literal "$CASA/$G"
+antes=$(estado_total)
+instalar --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'unica diferencia es la ruta del home' "$TMP/out"; then
+  ok install_home_literal_difference_conflicts_without_adopt
+else ko "install_home_literal_difference_conflicts_without_adopt (rc=$RC)"; cat "$TMP/out" | head; fi
+rm -rf "$TMP"
+
+# install_other_difference_still_conflicts_with_adopt
+nuevo_entorno
+con_home_literal "$CASA/$G"
+echo "# linea local de mas" >> "$CASA/$G"
+antes=$(estado_total)
+instalar --adopt --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'linea local de mas' "$TMP/out" \
+  && ! grep -q 'unica diferencia' "$TMP/out"; then
+  ok install_other_difference_still_conflicts_with_adopt
+else ko "install_other_difference_still_conflicts_with_adopt (rc=$RC)"; fi
+rm -rf "$TMP"
+
 exit $FAIL

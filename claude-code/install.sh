@@ -19,7 +19,9 @@
 # --adopt (seccion 7, paso 3 del diseno), por cada destino que existe y no es nuestro:
 #   - si el repo no tiene ese archivo o carpeta: se copia al repo (la usuaria lo
 #     commitea despues), se respalda el original y se pone el enlace;
-#   - si el repo lo tiene con el mismo contenido: se respalda y se pone el enlace;
+#   - si el repo lo tiene con el mismo contenido, o solo difiere en que el destino lleva
+#     el home real literal donde el repo lleva "$HOME/" (normalizar_home): se respalda
+#     y se pone el enlace (gana la version del repo);
 #   - si el repo lo tiene y difiere: se muestra la diferencia y se sale con 2 sin
 #     tocar nada (no se sobrescribe ningun lado en silencio).
 #   Solo se adoptan entradas sin enlaces simbolicos dentro (p. ej. no hooks/peon-ping).
@@ -147,12 +149,20 @@ while IFS="$TAB" read -r dest orig; do
   elif [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
     printf 'crear\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
   elif [ "$ADOPT" = 0 ]; then
-    info "conflicto: $dest existe y no es de este repo"
-    mostrar_diferencia "$dest" "$orig"
+    if ! mismo_contenido "$dest" "$orig" && equivalente_home "$dest" "$orig"; then
+      info "conflicto: $dest existe y no es de este repo; la unica diferencia es la ruta del home (literal en el destino, \$HOME en el repo); --adopt lo resuelve"
+    else
+      info "conflicto: $dest existe y no es de este repo"
+      mostrar_diferencia "$dest" "$orig"
+    fi
     CONFLICTO=1
   elif [ ! -e "$orig" ]; then
     printf 'adoptar-nuevo\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
   elif mismo_contenido "$dest" "$orig"; then
+    printf 'adoptar-igual\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
+  elif equivalente_home "$dest" "$orig"; then
+    # Solo difiere en el home literal: gana la version del repo (parametrizada).
+    info "$dest solo difiere en la ruta del home; se adopta la version del repo"
     printf 'adoptar-igual\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
   else
     info "conflicto: $dest difiere de la version del repo ($orig); no se adopta"
