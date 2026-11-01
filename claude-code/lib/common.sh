@@ -175,3 +175,15 @@ equivalente_home() {
   rm -rf "$_eq"
   return $_rc
 }
+
+# en_adopt_ignore <repo> <ruta>: 0 si <ruta> (relativa a ~/.claude, p. ej. skills/synced)
+# figura tal cual en <repo>/adopt-ignore. Comparacion literal, sin comodines; se saltan
+# las lineas vacias y las que empiezan por #.
+en_adopt_ignore() {
+  [ -f "$1/adopt-ignore" ] || return 1
+  while IFS= read -r _ai || [ -n "$_ai" ]; do
+    case $_ai in ""|"#"*) continue ;; esac
+    [ "$_ai" = "$2" ] && return 0
+  done < "$1/adopt-ignore"
+  return 1
+}

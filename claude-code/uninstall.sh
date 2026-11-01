@@ -9,7 +9,7 @@
 # solo si es identica a la que generaria el instalador (si no, se deja y se avisa). Lo
 # movido al respaldo se copia de vuelta (de todos los respaldos del manifiesto, del mas
 # antiguo al mas reciente); el respaldo nunca se borra. Lo adoptado al repo no se borra del
-# repo. Lo desconocido en ~/.claude se deja. El manifiesto se quita al final.
+# repo. Lo desconocido en ~/.claude se deja (p. ej. las rutas de adopt-ignore). El manifiesto se quita al final.
 #
 # Antes de cambiar nada comprueba todo; si el estado es incoherente (linea desconocida,
 # enlace de otro clon, ruta fuera de HOME, respaldo ausente, destino de restauracion

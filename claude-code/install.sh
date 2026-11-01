@@ -25,6 +25,8 @@
 #   - si el repo lo tiene y difiere: se muestra la diferencia y se sale con 2 sin
 #     tocar nada (no se sobrescribe ningun lado en silencio).
 #   Solo se adoptan entradas sin enlaces simbolicos dentro (p. ej. no hooks/peon-ping).
+#   Las rutas listadas en adopt-ignore (relativas a ~/.claude, literales) que el repo no
+#   tiene no se adoptan, respaldan ni enlazan, y no son conflicto: "ignorado: <ruta>".
 #
 # P4_FAIL_AFTER=<paso> (SOLO PARA PRUEBAS): termina con 1 justo despues del paso
 # indicado, para comprobar que repetir la instalacion converge.
@@ -96,6 +98,12 @@ pares() {
     for d in "$CLAUDE_DIR/$sub"/*; do
       [ -e "$d" ] || [ -L "$d" ] || continue
       [ -e "$REPO/$sub/${d##*/}" ] && continue
+      # adopt-ignore: solo afecta a entradas que el repo no tiene (las del repo siguen
+      # el camino normal). Se anota como linea especial para informarlo fuera.
+      if en_adopt_ignore "$REPO" "$sub/${d##*/}"; then
+        printf '#ignorado\t%s\n' "$sub/${d##*/}"
+        continue
+      fi
       if [ -L "$d" ] || find "$d" -type l 2>/dev/null | grep -q .; then
         aviso "no se adopta $d: es o contiene enlaces simbolicos (tratar a mano)"
         continue
@@ -144,6 +152,7 @@ LISTA=
 [ "$CONFLICTO" = 0 ] && LISTA=$(pares)
 while IFS="$TAB" read -r dest orig; do
   [ -n "$dest" ] || continue
+  if [ "$dest" = "#ignorado" ]; then info "ignorado: $orig (adopt-ignore)"; continue; fi
   if es_nuestro "$dest" "$orig"; then
     printf 'ok\t%s\t%s\n' "$dest" "$orig" >> "$PLAN"
   elif [ ! -e "$dest" ] && [ ! -L "$dest" ]; then

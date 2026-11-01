@@ -318,4 +318,18 @@ if [ "$r0" -eq 0 ] && [ "$RC" -eq 1 ] && grep -q "mi.mcp" "$TMP/out"; then ok do
 else ko "doctor_compares_mcp_names_literally ($r0, $RC)"; cat "$TMP/out"; fi
 rm -rf "$TMP"
 
+# doctor_ignores_adopt_ignore_paths: skills/synced (adopt-ignore) no es diferencia para
+# doctor, y uninstall lo deja en su sitio sin quejarse.
+nuevo_entorno
+instalar --non-interactive
+doctor; r0=$RC
+mkdir -p "$CASA/.claude/skills/synced/pdf"; echo cache > "$CASA/.claude/skills/synced/pdf/SKILL.md"
+doctor; r1=$RC; o1=$(cat "$TMP/out")
+desinstalar; r2=$RC
+if [ "$r0" -eq 0 ] && [ "$r1" -eq 0 ] && ! printf '%s\n' "$o1" | grep -q synced \
+  && [ "$r2" -eq 0 ] && [ "$(cat "$CASA/.claude/skills/synced/pdf/SKILL.md" 2>/dev/null)" = cache ]; then
+  ok doctor_ignores_adopt_ignore_paths
+else ko "doctor_ignores_adopt_ignore_paths ($r0 $r1 $r2)"; printf '%s\n' "$o1"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
 exit $FAIL

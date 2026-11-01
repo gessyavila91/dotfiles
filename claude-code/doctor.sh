@@ -17,6 +17,8 @@
 #         (plugins.<id>[].version); un plugin ausente de ese archivo es una diferencia;
 #   - MCP de mcp.json (los que aplican segun machine.env) contra `claude mcp list`
 #     (una linea "nombre: ..." por MCP registrado).
+# Solo se miran las entradas que el repo tiene y las del manifiesto: lo que hay de mas en
+# ~/.claude (p. ej. las rutas de adopt-ignore, como skills/synced) no es una diferencia.
 # Una fuente que no existe o no se puede ejecutar (binario, installed_plugins.json, claude)
 # es un aviso en stderr, no una diferencia.
 # Codigos: 0 todo coincide; 1 hay diferencias; 3 falta node.

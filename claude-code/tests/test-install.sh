@@ -404,4 +404,50 @@ if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'linea local d
 else ko "install_other_difference_still_conflicts_with_adopt (rc=$RC)"; fi
 rm -rf "$TMP"
 
+# ---------------------------------------------------------------------------
+# install_adopt_ignores_listed_paths: skills/synced (en adopt-ignore) no se toca.
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/synced/docx"
+echo "cache de la app" > "$CASA/.claude/skills/synced/docx/SKILL.md"
+casa_synced=$(huella "$CASA/.claude/skills/synced")
+repo_antes=$(huella "$CLON")
+instalar --adopt --non-interactive
+if [ "$RC" -eq 0 ] && [ ! -e "$CLON/skills/synced" ] && [ ! -L "$CASA/.claude/skills/synced" ] \
+  && [ "$casa_synced" = "$(huella "$CASA/.claude/skills/synced")" ] && [ -z "$(respaldos)" ] \
+  && grep -qx 'ignorado: skills/synced (adopt-ignore)' "$TMP/out" \
+  && ! grep -q 'skills/synced' "$CASA/.claude/.p4-manifest" \
+  && [ "$repo_antes" = "$(huella "$CLON" | grep -v '^F \./machine\.env ')" ]; then
+  ok install_adopt_ignores_listed_paths
+else ko "install_adopt_ignores_listed_paths (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head; fi
+rm -rf "$TMP"
+
+# install_adopt_ignore_is_literal: skills/synced-extra y skills/synce no estan en la lista.
+nuevo_entorno
+for n in synced-extra synce; do
+  mkdir -p "$CASA/.claude/skills/$n"; echo "$n" > "$CASA/.claude/skills/$n/SKILL.md"
+done
+instalar --adopt --non-interactive
+if [ "$RC" -eq 0 ] && es_enlace_a "$CASA/.claude/skills/synced-extra" "$CLON/skills/synced-extra" \
+  && es_enlace_a "$CASA/.claude/skills/synce" "$CLON/skills/synce" \
+  && [ -f "$CLON/skills/synced-extra/SKILL.md" ] && ! grep -q 'ignorado' "$TMP/out"; then
+  ok install_adopt_ignore_is_literal
+else ko "install_adopt_ignore_is_literal (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# install_adopt_ignore_only_unknown_entries: una ruta listada que el repo SI tiene sigue
+# el camino normal (se enlaza; si el destino es ajeno y distinto, conflicto).
+nuevo_entorno
+echo 'skills/estado' >> "$CLON/adopt-ignore"
+instalar --non-interactive
+r1=$RC; e1=0; es_enlace_a "$CASA/.claude/skills/estado" "$CLON/skills/estado" && e1=1
+rm -rf "$TMP"
+nuevo_entorno
+echo 'skills/estado' >> "$CLON/adopt-ignore"
+mkdir -p "$CASA/.claude/skills/estado"; echo distinto > "$CASA/.claude/skills/estado/SKILL.md"
+instalar --adopt --non-interactive
+if [ "$r1" -eq 0 ] && [ "$e1" -eq 1 ] && [ "$RC" -eq 2 ] && ! grep -q 'ignorado' "$TMP/out"; then
+  ok install_adopt_ignore_only_unknown_entries
+else ko "install_adopt_ignore_only_unknown_entries ($r1 $e1 $RC)"; fi
+rm -rf "$TMP"
+
 exit $FAIL
