@@ -566,6 +566,20 @@ grep -qx "copia	$CASA/.claude/skills/mia	$CLON/skills/mia" "$m" || { bien=0; ech
 [ "$bien" -eq 1 ] && ok install_copy_mode_adopt || ko install_copy_mode_adopt
 rm -rf "$TMP"
 
+# install_copy_mode_warns_with_backup_path_when_replacing: copia editada a mano -> al
+# reemplazarla, aviso con la ruta del respaldo donde quedan las ediciones.
+nuevo_entorno
+instalar --copy --non-interactive; rc1=$RC
+echo "mi edicion" >> "$CASA/.claude/CLAUDE.md"
+instalar --copy --non-interactive
+r=$(respaldos)
+p="$r/p4-copias-previas/.claude/CLAUDE.md"
+if [ "$rc1" -eq 0 ] && [ "$RC" -eq 0 ] && grep -q 'mi edicion' "$p" 2>/dev/null \
+  && grep -F "aviso: " "$TMP/err" | grep -qF "$p"; then
+  ok install_copy_mode_warns_with_backup_path_when_replacing
+else ko "install_copy_mode_warns_with_backup_path_when_replacing ($rc1 $RC)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
 # install_copy_mode_refuses_mixing_modes: instalado con enlaces -> --copy sale con 2 (y al reves).
 nuevo_entorno
 instalar --non-interactive

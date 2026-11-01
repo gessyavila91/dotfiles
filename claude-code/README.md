@@ -41,25 +41,27 @@ Contenido actual:
 
 Claude Code en Windows ya requiere Git Bash, así que se usan los mismos scripts POSIX ejecutados con Git Bash. `install.ps1`, `uninstall.ps1` y `doctor.ps1` son envoltorios mínimos: buscan `bash.exe` de Git for Windows (junto a `git.exe`, o en `C:\Program Files\Git\bin\bash.exe`), fijan `P4_COPY=1` y ejecutan el `.sh` del mismo nombre traduciendo `-DryRun`, `-Adopt` y `-NonInteractive` a `--dry-run`, `--adopt` y `--non-interactive`. Devuelven el código de salida del script. **Los envoltorios `.ps1` no se han ejecutado nunca** (no había PowerShell donde se escribieron): hay que comprobarlos en la laptop (ver abajo).
 
-- Requisitos: Git for Windows (con Git Bash), Node.js y la CLI `claude` en el `PATH`.
-- Clonar el repo en `%USERPROFILE%\.config` y ejecutar, desde PowerShell, `.\.config\claude-code\install.ps1 -NonInteractive` (o, desde Git Bash, `sh ~/.config/claude-code/install.sh`, que en Windows usa copias aunque no se pase `--copy`).
-- Semántica de copia: en vez de enlaces, se copian `CLAUDE.md`, cada skill, cada hook, el tema y los hooks de git (los 14 nombres de `git-hooks/NAMES` son copias de `dispatch`, junto a `lib.sh`), con `cp -Rp` a una carpeta temporal hermana y luego `mv`. El manifiesto anota cada copia (`copia`); es lo que la hace «nuestra». **Tras cambiar algo en el repo hay que volver a ejecutar el instalador**: una copia nuestra que difiere del repo se actualiza y la anterior se guarda en `<respaldo>/p4-copias-previas/` (no se restaura al desinstalar). Un destino que no es nuestro sigue el mismo camino que con enlaces (conflicto con 2, o `--adopt`).
+- Requisitos: Git for Windows (con Git Bash), Node.js y la CLI `claude` en el `PATH`. Solo se soporta Git Bash (`uname` `MINGW…`/`MSYS…`); Cygwin no.
+- ExecutionPolicy: con la política por defecto (`Restricted`) o una GPO de la empresa, `.\install.ps1` se bloquea antes de ejecutarse. Ejecutarlo con `powershell -ExecutionPolicy Bypass -File <ruta>\claude-code\install.ps1 -NonInteractive` (igual para `uninstall.ps1` y `doctor.ps1`), o, si la GPO lo permite, una vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+- Clonar el repo en `%USERPROFILE%\.config` y ejecutar, desde PowerShell, `powershell -ExecutionPolicy Bypass -File .\.config\claude-code\install.ps1 -NonInteractive` (o, desde Git Bash, `sh ~/.config/claude-code/install.sh`, que en Windows usa copias aunque no se pase `--copy`).
+- Semántica de copia: en vez de enlaces, se copian `CLAUDE.md`, cada skill, cada hook, el tema y los hooks de git (los 14 nombres de `git-hooks/NAMES` son copias de `dispatch`, junto a `lib.sh`), con `cp -Rp` a una carpeta temporal hermana y luego `mv`. El manifiesto anota cada copia (`copia`); es lo que la hace «nuestra». **Tras cambiar algo en el repo hay que volver a ejecutar el instalador**: una copia nuestra que difiere del repo se actualiza y la anterior se guarda en `<respaldo>/p4-copias-previas/` (no se restaura al desinstalar); el instalador avisa (`aviso:`) con esa ruta, por si la copia tenía ediciones propias. Un destino que no es nuestro sigue el mismo camino que con enlaces (conflicto con 2, o `--adopt`).
 - `uninstall` quita solo las copias idénticas al repo; una copia con cambios a mano (o desfasada porque el repo cambió sin reinstalar) se conserva y se avisa, y lo que el respaldo tenga en esa ruta se queda en el respaldo. `doctor` compara cada copia con el repo y señala las que faltan, difieren o ya no tienen origen.
 - En Git Bash `uname` da `MINGW…`/`MSYS…`: el sistema se detecta como `windows` (plantilla `settings.windows.json`, `NODE=node`).
-- `.gitattributes` fuerza fin de línea LF en todo el árbol: con `core.autocrlf=true` (lo habitual en Git for Windows) un CRLF rompe los scripts de sh.
+- `claude-code/.gitattributes` fuerza fin de línea LF en todo `claude-code/` (no en el resto del repo): con `core.autocrlf=true` (lo habitual en Git for Windows) un CRLF rompe los scripts de sh.
 - Las pruebas del modo copia se ejecutan en macOS con un `HOME` temporal (`install_copy_mode_*`, `uninstall_copy_mode_*`, `doctor_copy_mode_*`); lo propio de Windows no.
 
 ### Comprobaciones en Windows
 
 Pendientes en la laptop, en este orden (nada de esto se ha probado):
 
+0. ExecutionPolicy: `Get-ExecutionPolicy -List`. Si `.\.config\claude-code\doctor.ps1` dice que la ejecución de scripts está deshabilitada, usar `powershell -ExecutionPolicy Bypass -File <ruta>\claude-code\<script>.ps1 …` en todos los pasos siguientes (o `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` si la GPO lo permite) y anotar cuál funcionó.
 1. `git --version`, `node --version` y `claude --version` responden en PowerShell; `& 'C:\Program Files\Git\bin\bash.exe' -c 'echo $HOME; uname -s; command -v node'` muestra el `HOME` equivalente a `%USERPROFILE%`, `MINGW64_NT-…` y una ruta a `node`.
 2. `.\.config\claude-code\install.ps1 -DryRun -NonInteractive`: dice «modo copia» y lista copias, no enlaces; no escribe nada.
 3. `.\.config\claude-code\install.ps1 -NonInteractive` (o con `-Adopt` si ya hay un `~\.claude` usado): sale con 0; `~\.claude\CLAUDE.md`, `skills\`, `hooks\` y `~\.config\git\hooks\` tienen archivos normales; `git config --global core.hooksPath` apunta a `~/.config/git/hooks`; `echo $LASTEXITCODE` coincide con el del script.
 4. Repetirlo: no cambia nada. Cambiar una línea de `CLAUDE.md` en el repo y repetirlo: se actualiza y la anterior queda en `~\Respaldos\p4-…\p4-copias-previas`.
 5. `.\.config\claude-code\doctor.ps1`: sale con 0 (o solo con diferencias esperables de versiones). Editar `~\.claude\CLAUDE.md` a mano: `doctor` lo señala.
 6. `claude mcp list`: aparecen los MCP de `mcp.json` que aplican.
-7. Hooks bajo Git Bash: abrir Claude Code y comprobar que se ejecutan `gitflow-guard.sh` y `estado-guard.sh` (p. ej. un `git push` a `main` bloqueado) y que `settings.json` usa rutas que Git Bash entiende (`/c/Users/<usuaria>/...`); un `git push` en un repo con los hooks globales pasa por `dispatch`.
+7. Hooks bajo Git Bash: abrir Claude Code y comprobar que se ejecutan `gitflow-guard.sh` y `estado-guard.sh` (p. ej. un `git push` a `main` bloqueado) y que `settings.json` usa rutas que Git Bash entiende (`/c/<perfil>/...`); un `git push` en un repo con los hooks globales pasa por `dispatch`.
 8. `node` en el `PATH` de los hooks: el hook de ccdeck (`{{NODE}}` = `node`) no falla.
 9. `.\.config\claude-code\uninstall.ps1 -DryRun` y luego `uninstall.ps1`: quita las copias, restaura el respaldo y deja `core.hooksPath` como estaba; repetirlo sale con 1 («nada instalado»).
 

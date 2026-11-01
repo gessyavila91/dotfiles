@@ -23,7 +23,17 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 
 $a = @()
 if ($DryRun) { $a += '--dry-run' }
+# $rc empieza en 1: si algo lanza una excepcion antes de terminar, no se devuelve 0.
+# P4_COPY vuelve a su valor anterior al salir.
+$rc = 1
+$prevCopy = $env:P4_COPY
 $env:P4_COPY = '1'
 Push-Location $PSScriptRoot
-try { & $bash ./uninstall.sh @a; $rc = $LASTEXITCODE } finally { Pop-Location }
+try {
+  & $bash ./uninstall.sh @a
+  $rc = $LASTEXITCODE
+} finally {
+  Pop-Location
+  $env:P4_COPY = $prevCopy
+}
 exit $rc

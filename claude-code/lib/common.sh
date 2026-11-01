@@ -113,12 +113,12 @@ ruta_resuelta() {
 }
 
 # detectar_os: fija OS (macos|linux|windows) segun uname; devuelve 1 si no se soporta.
-# En Windows solo se admite Git Bash (MINGW/MSYS) o Cygwin.
+# En Windows solo se admite Git Bash (uname MINGW*/MSYS*); Cygwin no.
 detectar_os() {
   case $(uname -s) in
     Darwin) OS=macos ;;
     Linux) OS=linux ;;
-    MINGW*|MSYS*|CYGWIN*) OS=windows ;;
+    MINGW*|MSYS*) OS=windows ;;
     *) return 1 ;;
   esac
 }
@@ -147,7 +147,8 @@ respaldar_copia_previa() {
   respaldo_dir || return 1
   _rcp=${1#"$HOME"/}
   mkdir -p "$RESPALDO/p4-copias-previas/$(dirname "$_rcp")" || return 1
-  mv "$1" "$RESPALDO/p4-copias-previas/$_rcp"
+  mv "$1" "$RESPALDO/p4-copias-previas/$_rcp" || return 1
+  aviso "la copia anterior de $1 se guardo en $RESPALDO/p4-copias-previas/$_rcp; si tenia ediciones propias, estan ahi"
 }
 
 # settings_regenerar <repo> <os> <salida>: genera el settings.json que produciria el
