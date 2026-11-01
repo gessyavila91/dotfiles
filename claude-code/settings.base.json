@@ -25,6 +25,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -60,6 +61,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -112,6 +114,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -134,6 +137,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -209,6 +213,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -239,6 +244,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -270,6 +276,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -300,6 +307,7 @@
         ]
       },
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -311,6 +319,7 @@
     ],
     "PostToolUse": [
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -322,6 +331,7 @@
     ],
     "SubagentStop": [
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -333,6 +343,7 @@
     ],
     "StopFailure": [
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",
@@ -344,6 +355,7 @@
     ],
     "UserPromptExpansion": [
       {
+        "__agent-dag": true,
         "hooks": [
           {
             "type": "command",

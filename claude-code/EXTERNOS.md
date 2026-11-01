@@ -20,3 +20,7 @@ Reinstalación:
 ## cbm-code-discovery-gate
 
 Hook de codebase-memory-mcp, sí versionado. Única diferencia con el origen: la ruta del binario se parametriza como `$HOME/.local/bin/codebase-memory-mcp` en vez de la ruta literal del directorio personal, y la prueba lo compara tras esa sustitución.
+
+Los hooks `agent-dag` de settings.json y la marca `"__agent-dag": true` en 12 entradas los gestiona ccdeck, que los vuelve a poner.
+Se capturan en `settings.base.json` para que la plantilla siga equivalente al archivo real; no se copian los scripts.
+En un equipo nuevo hay que instalar ccdeck para que esos hooks funcionen.
