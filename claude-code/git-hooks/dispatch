@@ -1,0 +1,49 @@
+#!/bin/sh
+# Despachador global de hooks de git (se invoca por symlink con nombre de hook).
+# Guarda de Gitflow en pre-push y encadenado al hook propio del repo.
+hook=$(basename "$0")
+# Resuelve el symlink (sin readlink -f) para ubicar el dispatch real.
+self=$0
+while [ -L "$self" ]; do
+  target=$(readlink "$self")
+  case "$target" in
+    /*) self=$target ;;
+    *) self="$(dirname "$self")/$target" ;;
+  esac
+done
+dir=$(cd "$(dirname "$self")" && pwd)
+# lib.sh junto al despachador (instalado) o un nivel arriba (checkout del repo)
+if [ -f "$dir/lib.sh" ]; then . "$dir/lib.sh"; else . "$dir/../lib.sh"; fi
+
+stdin_file=
+if [ "$hook" = "pre-push" ]; then
+  stdin_file=$(mktemp "${TMPDIR:-/tmp}/gfg-stdin.XXXXXX") || exit 1
+  trap 'rm -f "$stdin_file"' EXIT
+  cat > "$stdin_file"
+fi
+
+if [ "$hook" = "pre-push" ] && ! gfg_is_exempt .; then
+  while read -r _lref _lsha rref _rsha; do
+    case "$rref" in
+      refs/heads/*)
+        b=${rref#refs/heads/}
+        if gfg_is_protected . "$b"; then
+          echo "gitflow-guard: push rechazado, '$b' es una rama protegida. Abre un PR hacia '$b' en lugar de hacer push directo." >&2
+          exit 1
+        fi
+        ;;
+    esac
+  done < "$stdin_file"
+fi
+
+common=$(git rev-parse --git-common-dir 2>/dev/null) || exit 0
+repo_hook="$common/hooks/$hook"
+if [ -x "$repo_hook" ]; then
+  if [ -n "$stdin_file" ]; then
+    "$repo_hook" "$@" < "$stdin_file"
+  else
+    "$repo_hook" "$@"
+  fi
+  exit $?
+fi
+exit 0
