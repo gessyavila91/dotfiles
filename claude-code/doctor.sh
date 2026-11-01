@@ -65,9 +65,16 @@ revisar_enlace() {
     dif "falta el enlace $_d (deberia apuntar a $_o)"
   fi
 }
+# Los hooks de git solo se revisan si el manifiesto dice que el instalador los puso
+# (si la carpeta tenia contenido ajeno, los omitio a proposito).
+GIT_INSTALADOS=0
+if [ -f "$MANIFEST" ] && grep -q "^link$TAB$GITHOOKS_DIR/" "$MANIFEST"; then GIT_INSTALADOS=1; fi
+[ "$GIT_INSTALADOS" = 1 ] || aviso "hooks de git no instalados en este equipo segun el manifiesto; no se revisan"
 PARES=$(pares_repo "$REPO" "$CLAUDE_DIR" "$GITHOOKS_DIR")
 while IFS="$TAB" read -r dest orig; do
-  [ -n "$dest" ] && revisar_enlace "$dest" "$orig"
+  [ -n "$dest" ] || continue
+  case $dest in "$GITHOOKS_DIR"/*) [ "$GIT_INSTALADOS" = 1 ] || continue ;; esac
+  revisar_enlace "$dest" "$orig"
 done <<EOF
 $PARES
 EOF
@@ -80,7 +87,7 @@ fi
 # --- core.hooksPath -----------------------------------------------------------
 hp=$(git config --global --get core.hooksPath 2>/dev/null)
 case $hp in "~/"*) hp="$HOME/${hp#"~/"}" ;; esac
-[ "$hp" = "$GITHOOKS_DIR" ] || dif "core.hooksPath vale '${hp:-(sin fijar)}' y deberia valer $GITHOOKS_DIR"
+[ "$GIT_INSTALADOS" = 0 ] || [ "$hp" = "$GITHOOKS_DIR" ] || dif "core.hooksPath vale '${hp:-(sin fijar)}' y deberia valer $GITHOOKS_DIR"
 
 # --- settings.json ------------------------------------------------------------
 if ! detectar_os; then

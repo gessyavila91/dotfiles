@@ -63,11 +63,11 @@ asegurar_dir() {
 # (origen es ruta fisica; se admite un destino relativo o con otra forma de la ruta).
 es_nuestro() {
   [ -L "$1" ] || return 1
-  _t=$(readlink "$1") || return 1
-  [ "$_t" = "$2" ] && return 0
-  case $_t in /*) ;; *) _t="$(dirname "$1")/$_t" ;; esac
-  _d=$(cd "$(dirname "$_t")" 2>/dev/null && pwd -P) || return 1
-  [ "$_d/$(basename "$_t")" = "$2" ]
+  _en_t=$(readlink "$1") || return 1
+  [ "$_en_t" = "$2" ] && return 0
+  case $_en_t in /*) ;; *) _en_t="$(dirname "$1")/$_en_t" ;; esac
+  _en_d=$(cd "$(dirname "$_en_t")" 2>/dev/null && pwd -P) || return 1
+  [ "$_en_d/$(basename "$_en_t")" = "$2" ]
 }
 
 # mismo_contenido <a> <b>: 0 si archivos o carpetas tienen el mismo contenido.

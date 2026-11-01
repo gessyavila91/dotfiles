@@ -332,4 +332,26 @@ if [ "$r0" -eq 0 ] && [ "$r1" -eq 0 ] && ! printf '%s\n' "$o1" | grep -q synced 
 else ko "doctor_ignores_adopt_ignore_paths ($r0 $r1 $r2)"; printf '%s\n' "$o1"; cat "$TMP/err"; fi
 rm -rf "$TMP"
 
+# ---------------------------------------------------------------------------
+# doctor_ignores_git_hooks_not_in_manifest: carpeta de hooks ajena, el instalador la omitio
+nuevo_entorno
+mkdir -p "$CASA/.config/git/hooks"; echo '#!/bin/sh' > "$CASA/.config/git/hooks/pre-commit"
+instalar --non-interactive
+doctor
+if [ "$RC" -eq 0 ] && ! grep -q '^diferencia' "$TMP/out" && grep -q 'hooks de git no instalados' "$TMP/err"; then ok doctor_ignores_git_hooks_not_in_manifest
+else ko "doctor_ignores_git_hooks_not_in_manifest ($RC)"; cat "$TMP/out" "$TMP/err"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# doctor_shows_relative_link_target: se muestra el destino del enlace tal cual
+nuevo_entorno
+instalar --non-interactive
+rm -f "$CASA/.claude/CLAUDE.md"; ln -s rel-destino "$CASA/.claude/CLAUDE.md"
+echo x > "$CASA/.claude/rel-destino"
+rm -f "$CASA/.config/git/hooks/lib.sh"; ln -s dispatch "$CASA/.config/git/hooks/lib.sh"
+doctor
+if [ "$RC" -eq 1 ] && grep -q 'CLAUDE.md apunta a rel-destino' "$TMP/out" && grep -q 'lib.sh -> dispatch' "$TMP/out"; then ok doctor_shows_relative_link_target
+else ko "doctor_shows_relative_link_target ($RC)"; cat "$TMP/out"; fi
+rm -rf "$TMP"
+
 exit $FAIL
