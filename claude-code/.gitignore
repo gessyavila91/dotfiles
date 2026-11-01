@@ -1,0 +1,3 @@
+# Archivo local de cada equipo (ver machine.env.example); no se versiona.
+/machine.env
+/machine.env.tmp

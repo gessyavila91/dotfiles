@@ -1,0 +1,3 @@
+# Los scripts se ejecutan con Git Bash tambien en Windows: fin de linea LF siempre, en
+# todos los sistemas (con core.autocrlf=true un CRLF rompe sh). PowerShell lee LF sin problema.
+* text=auto eol=lf

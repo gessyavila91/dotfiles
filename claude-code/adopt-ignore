@@ -1,0 +1,6 @@
+# Rutas relativas a ~/.claude que install.sh --adopt no adopta (ni respalda, ni enlaza, ni
+# cuenta como conflicto) cuando el repo no las tiene. Una por linea, comparacion literal
+# (sin comodines); lineas vacias y las que empiezan por # se ignoran.
+
+# Cache administrada por la app de Claude (ver INVENTARIO.md).
+skills/synced

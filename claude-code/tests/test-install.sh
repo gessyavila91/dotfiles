@@ -1,0 +1,616 @@
+#!/bin/sh
+# Pruebas de install.sh. Cada caso usa un HOME temporal, un gitconfig global temporal,
+# GIT_CONFIG_NOSYSTEM=1, un `claude` falso al frente del PATH y una COPIA del arbol
+# claude-code/ (el "clon"), para que adoptar o crear machine.env no toque el repo real.
+# Interprete del instalador: TEST_SH (por defecto sh; p. ej. TEST_SH=dash).
+HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$HERE/.." && pwd)
+TEST_SH=${TEST_SH:-sh}
+FAIL=0
+
+ok() { echo "ok   $1"; }
+ko() { echo "FALLA $1"; FAIL=1; }
+
+# nuevo_entorno: TMP con casa/, clon/claude-code (copia), bin/claude falso y gitconfig.
+nuevo_entorno() {
+  TMP=$(mktemp -d) || exit 1
+  TMP=$(cd "$TMP" && pwd -P) || exit 1
+  # CON_ESPACIOS=1: HOME y clon con un espacio en la ruta.
+  if [ "${CON_ESPACIOS:-0}" = 1 ]; then CASA="$TMP/mi casa"; CLON="$TMP/el clon/claude-code"
+  else CASA="$TMP/casa"; CLON="$TMP/clon/claude-code"; fi
+  mkdir -p "$CASA" "$TMP/bin" "$(dirname "$CLON")"
+  cp -R "$ROOT" "$CLON"
+  rm -f "$CLON/machine.env"
+  : > "$TMP/gitconfig"
+  : > "$TMP/llamadas.log"
+  cat > "$TMP/bin/claude" <<'FAKE'
+#!/bin/sh
+echo "$*" >> "$FAKE_LOG"
+[ "$1 $2" = "mcp get" ] && exit 1
+exit 0
+FAKE
+  chmod +x "$TMP/bin/claude"
+}
+
+# instalar [args...]: ejecuta el instalador del clon; deja RC, $TMP/out y $TMP/err.
+instalar() {
+  env HOME="$CASA" GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 \
+    FAKE_LOG="$TMP/llamadas.log" PATH="$TMP/bin:$PATH" \
+    "$TEST_SH" "$CLON/install.sh" "$@" </dev/null >"$TMP/out" 2>"$TMP/err"
+  RC=$?
+}
+
+# huella <dir>: tipo, ruta relativa, destino de enlace o suma del contenido. Las rutas
+# del entorno (HOME, clon) y los nombres con fecha de respaldo se normalizan.
+huella() {
+  ( cd "$1" && find . | LC_ALL=C sort | while IFS= read -r p; do
+      if [ -L "$p" ]; then printf 'L %s %s\n' "$p" "$(readlink "$p")"
+      elif [ -d "$p" ]; then printf 'D %s\n' "$p"
+      else printf 'F %s %s\n' "$p" "$(sed -e "s|$TMP|TMP|g" -e 's/p4-[0-9]\{8\}-[0-9]\{6\}-[A-Za-z0-9]\{6\}/p4-RESP/g' "$p" | cksum)"
+      fi
+    done ) | sed -e "s|$TMP|TMP|g" -e 's/p4-[0-9]\{8\}-[0-9]\{6\}-[A-Za-z0-9]\{6\}/p4-RESP/g' \
+      -e 's/p4-bak-[0-9]\{8\}-[0-9]\{6\}/p4-bak-TS/g'
+}
+
+# estado_total: casa, clon y gitconfig.
+estado_total() {
+  huella "$CASA"; echo ==; huella "$CLON"; echo ==; cat "$TMP/gitconfig"
+}
+
+# es_enlace_a <destino> <origen>
+es_enlace_a() { [ -L "$1" ] && [ "$(readlink "$1")" = "$2" ]; }
+
+respaldos() { ls -d "$CASA"/Respaldos/p4-* 2>/dev/null; }
+
+# ---------------------------------------------------------------------------
+# install_fresh_creates_links_and_settings
+nuevo_entorno
+instalar --non-interactive
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/err"; }
+es_enlace_a "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  CLAUDE.md"; }
+for s in "$CLON"/skills/*; do
+  es_enlace_a "$CASA/.claude/skills/${s##*/}" "$s" || { bien=0; echo "  skill ${s##*/}"; }
+done
+for h in "$CLON"/hooks/*; do
+  es_enlace_a "$CASA/.claude/hooks/${h##*/}" "$h" || { bien=0; echo "  hook ${h##*/}"; }
+done
+es_enlace_a "$CASA/.claude/themes/dracula.json" "$CLON/themes/dracula.json" || { bien=0; echo "  tema"; }
+while IFS= read -r n; do
+  es_enlace_a "$CASA/.config/git/hooks/$n" "$CLON/git-hooks/dispatch" || { bien=0; echo "  git hook $n"; }
+done < "$CLON/git-hooks/NAMES"
+es_enlace_a "$CASA/.config/git/hooks/lib.sh" "$CLON/git-hooks/lib.sh" || { bien=0; echo "  lib.sh"; }
+[ "$(GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath)" = "$CASA/.config/git/hooks" ] \
+  || { bien=0; echo "  core.hooksPath"; }
+s="$CASA/.claude/settings.json"
+{ [ -f "$s" ] && [ ! -L "$s" ] && node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$s" \
+  && ! grep -q '{{HOME}}' "$s"; } || { bien=0; echo "  settings.json"; }
+grep -qx 'IDE_MCP=no' "$CLON/machine.env" 2>/dev/null || { bien=0; echo "  machine.env"; }
+grep -q 'machine.env' "$TMP/out" || { bien=0; echo "  no avisa de machine.env creado"; }
+m="$CASA/.claude/.p4-manifest"
+{ [ -f "$m" ] && grep -q "^link	$CASA/.claude/CLAUDE.md	$CLON/CLAUDE.md\$" "$m" \
+  && grep -q "^settings	$CASA/.claude/settings.json" "$m"; } || { bien=0; echo "  manifiesto"; }
+grep -q '^mcp add-json ' "$TMP/llamadas.log" || { bien=0; echo "  mcp_register no llamado"; }
+[ -z "$(respaldos)" ] || { bien=0; echo "  respaldo innecesario"; }
+[ "$bien" -eq 1 ] && ok install_fresh_creates_links_and_settings || ko install_fresh_creates_links_and_settings
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_is_idempotent
+nuevo_entorno
+instalar --non-interactive
+antes=$(estado_total)
+instalar --non-interactive
+rc2=$RC
+despues=$(estado_total)
+if [ "$rc2" -eq 0 ] && [ "$antes" = "$despues" ]; then ok install_is_idempotent
+else ko "install_is_idempotent (rc=$rc2)"; printf '%s\n' "$antes" > "$TMP/a"; printf '%s\n' "$despues" | diff "$TMP/a" - | head -20; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_backs_up_before_changing: una skill ajena identica, con --adopt.
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills"
+cp -R "$CLON/skills/estado" "$CASA/.claude/skills/estado"
+instalar --adopt --non-interactive
+r=$(respaldos)
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/err"; }
+[ "$(printf '%s\n' "$r" | grep -c .)" -eq 1 ] || { bien=0; echo "  respaldos: $r"; }
+case ${r##*/} in p4-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-??????) ;; *) bien=0; echo "  nombre $r";; esac
+[ "$(ls -ld "$r" | cut -c1-10)" = "drwx------" ] || { bien=0; echo "  permisos"; }
+diff -r "$r/.claude/skills/estado" "$CLON/skills/estado" >/dev/null || { bien=0; echo "  contenido respaldado"; }
+es_enlace_a "$CASA/.claude/skills/estado" "$CLON/skills/estado" || { bien=0; echo "  enlace"; }
+grep -qx "backup=$r" "$CASA/.claude/.p4-manifest" || { bien=0; echo "  backup= en manifiesto"; }
+[ "$bien" -eq 1 ] && ok install_backs_up_before_changing || ko install_backs_up_before_changing
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_refuses_existing_foreign_file
+nuevo_entorno
+mkdir -p "$CASA/.claude"
+echo "reglas de otra persona" > "$CASA/.claude/CLAUDE.md"
+antes=$(estado_total)
+instalar --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'reglas de otra persona' "$TMP/out" "$TMP/err"; then
+  ok install_refuses_existing_foreign_file
+else ko "install_refuses_existing_foreign_file (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_refuses_foreign_symlink: enlace a otro clon, aun con el mismo contenido.
+nuevo_entorno
+mkdir -p "$CASA/.claude" "$TMP/otro"
+cp "$CLON/CLAUDE.md" "$TMP/otro/CLAUDE.md"
+ln -s "$TMP/otro/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+antes=$(estado_total)
+instalar --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q "$TMP/otro/CLAUDE.md" "$TMP/out" "$TMP/err"; then
+  ok install_refuses_foreign_symlink
+else ko "install_refuses_foreign_symlink (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_adopt_copies_into_repo_then_links: skill que el repo no tiene.
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/mia"
+echo "skill propia" > "$CASA/.claude/skills/mia/SKILL.md"
+instalar --adopt --non-interactive
+r=$(respaldos)
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/err"; }
+[ "$(cat "$CLON/skills/mia/SKILL.md" 2>/dev/null)" = "skill propia" ] || { bien=0; echo "  no se copio al repo"; }
+es_enlace_a "$CASA/.claude/skills/mia" "$CLON/skills/mia" || { bien=0; echo "  enlace"; }
+[ "$(cat "$r/.claude/skills/mia/SKILL.md" 2>/dev/null)" = "skill propia" ] || { bien=0; echo "  respaldo"; }
+grep -q "^adopt	$CLON/skills/mia	" "$CASA/.claude/.p4-manifest" || { bien=0; echo "  manifiesto adopt"; }
+[ "$bien" -eq 1 ] && ok install_adopt_copies_into_repo_then_links || ko install_adopt_copies_into_repo_then_links
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_adopt_identical_file_links
+nuevo_entorno
+mkdir -p "$CASA/.claude"
+cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+repo_antes=$(huella "$CLON")
+instalar --adopt --non-interactive
+r=$(respaldos)
+if [ "$RC" -eq 0 ] && es_enlace_a "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" \
+  && cmp -s "$r/.claude/CLAUDE.md" "$CLON/CLAUDE.md" \
+  && [ "$repo_antes" = "$(huella "$CLON" | grep -v '^F \./machine\.env ')" ]; then
+  ok install_adopt_identical_file_links
+else ko "install_adopt_identical_file_links (rc=$RC)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_adopt_differing_file_exit_2: el repo ya lo tiene y difiere; nada cambia.
+nuevo_entorno
+mkdir -p "$CASA/.claude"
+echo "version local distinta" > "$CASA/.claude/CLAUDE.md"
+antes=$(estado_total)
+instalar --adopt --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'version local distinta' "$TMP/out" "$TMP/err"; then
+  ok install_adopt_differing_file_exit_2
+else ko "install_adopt_differing_file_exit_2 (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_backs_up_modified_settings
+nuevo_entorno
+instalar --non-interactive
+cp "$CASA/.claude/settings.json" "$TMP/generado.json"
+node -e 'const f=process.argv[1],fs=require("fs");const s=JSON.parse(fs.readFileSync(f,"utf8"));s.aMano=true;fs.writeFileSync(f,JSON.stringify(s));' "$CASA/.claude/settings.json"
+cp "$CASA/.claude/settings.json" "$TMP/modificado.json"
+instalar --non-interactive
+rc2=$RC
+r=$(respaldos)
+bak=$(ls "$r"/settings.json.p4-bak-* 2>/dev/null)
+instalar --non-interactive
+if [ "$rc2" -eq 0 ] && cmp -s "$CASA/.claude/settings.json" "$TMP/generado.json" \
+  && [ ! -L "$CASA/.claude/settings.json" ] && [ -n "$bak" ] && cmp -s "$bak" "$TMP/modificado.json" \
+  && [ "$(respaldos | grep -c .)" -eq 1 ]; then
+  ok install_backs_up_modified_settings
+else ko "install_backs_up_modified_settings (rc=$rc2, bak=$bak)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_dry_run_changes_nothing: settings previo distinto y sin machine.env.
+nuevo_entorno
+mkdir -p "$CASA/.claude"
+echo '{"x":1}' > "$CASA/.claude/settings.json"
+antes=$(estado_total)
+instalar --dry-run --non-interactive
+if [ "$RC" -eq 0 ] && [ "$antes" = "$(estado_total)" ] && [ ! -s "$TMP/llamadas.log" ] \
+  && grep -q 'CLAUDE.md' "$TMP/out" && grep -q 'settings.json' "$TMP/out"; then
+  ok install_dry_run_changes_nothing
+else ko "install_dry_run_changes_nothing (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head -20; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_resumes_after_interrupt: P4_FAIL_AFTER (solo pruebas) corta tras un paso.
+nuevo_entorno
+mkdir -p "$CASA/.claude"
+echo '{"x":1}' > "$CASA/.claude/settings.json"
+instalar --non-interactive
+rc_limpio=$RC
+limpio=$(huella "$CASA"; echo ==; cat "$TMP/gitconfig" | sed "s|$TMP|TMP|g")
+rm -rf "$TMP"
+nuevo_entorno
+mkdir -p "$CASA/.claude"
+echo '{"x":1}' > "$CASA/.claude/settings.json"
+P4_FAIL_AFTER=enlaces; export P4_FAIL_AFTER
+instalar --non-interactive; rc_a=$RC
+P4_FAIL_AFTER=settings
+instalar --non-interactive; rc_b=$RC
+unset P4_FAIL_AFTER
+instalar --non-interactive; rc_c=$RC
+final=$(huella "$CASA"; echo ==; cat "$TMP/gitconfig" | sed "s|$TMP|TMP|g")
+r=$(respaldos)
+if [ "$rc_limpio" -eq 0 ] && [ "$rc_a" -ne 0 ] && [ "$rc_b" -ne 0 ] && [ "$rc_c" -eq 0 ] \
+  && [ "$limpio" = "$final" ] && [ "$(printf '%s\n' "$r" | grep -c .)" -eq 1 ] \
+  && [ "$(cat "$r"/settings.json.p4-bak-* 2>/dev/null)" = '{"x":1}' ]; then
+  ok install_resumes_after_interrupt
+else
+  ko "install_resumes_after_interrupt (rc $rc_limpio $rc_a $rc_b $rc_c)"
+  printf '%s\n' "$limpio" > "$TMP/l"; printf '%s\n' "$final" | diff "$TMP/l" - | head -20
+fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_missing_node_exit_3: PATH con lo basico pero sin node.
+nuevo_entorno
+mkdir -p "$TMP/sinnode"
+for b in sh dash git uname dirname basename cat mkdir ln cp mv rm cmp diff date mktemp chmod \
+  grep sed find sort printf readlink tr env ls cut head wc touch; do
+  p=$(command -v "$b" 2>/dev/null) && case $p in /*) ln -s "$p" "$TMP/sinnode/$b" ;; esac
+done
+env HOME="$CASA" GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 PATH="$TMP/sinnode" \
+  "$TMP/sinnode/$TEST_SH" "$CLON/install.sh" --non-interactive </dev/null >"$TMP/out" 2>"$TMP/err"
+RC=$?
+if [ "$RC" -eq 3 ] && [ ! -e "$CASA/.claude" ] && grep -q 'node' "$TMP/err"; then ok install_missing_node_exit_3
+else ko "install_missing_node_exit_3 (rc=$RC)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_respects_foreign_git_hooks: hooksPath ya fijado y contenido ajeno en hooks/.
+nuevo_entorno
+GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 git config --global core.hooksPath /otra/ruta
+mkdir -p "$CASA/.config/git/hooks"
+echo '#!/bin/sh' > "$CASA/.config/git/hooks/pre-commit"
+instalar --non-interactive
+if [ "$RC" -eq 0 ] && [ ! -L "$CASA/.config/git/hooks/pre-commit" ] && [ ! -e "$CASA/.config/git/hooks/lib.sh" ] \
+  && [ "$(GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath)" = /otra/ruta ] \
+  && grep -qi 'aviso' "$TMP/err"; then
+  ok install_respects_foreign_git_hooks
+else ko "install_respects_foreign_git_hooks (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_refuses_parent_symlink_into_repo: ~/.claude/skills -> <clon>/skills
+# (como haria stow). Con y sin --adopt: salida 2 y repo y casa intactos.
+for modo in "" --adopt; do
+  nuevo_entorno
+  mkdir -p "$CASA/.claude"
+  ln -s "$CLON/skills" "$CASA/.claude/skills"
+  antes=$(estado_total)
+  instalar --non-interactive $modo
+  if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'mano' "$TMP/err"; then
+    ok "install_refuses_parent_symlink_into_repo ${modo:-sin-adopt}"
+  else ko "install_refuses_parent_symlink_into_repo ${modo:-sin-adopt} (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head; fi
+  rm -rf "$TMP"
+done
+
+# ---------------------------------------------------------------------------
+# install_refuses_parent_resolving_outside_home: ~/.claude -> fuera de HOME y
+# ~/.config/git -> fuera de HOME. Nada se escribe fuera.
+for caso in claude git; do
+  nuevo_entorno
+  mkdir -p "$TMP/fuera"
+  if [ "$caso" = claude ]; then ln -s "$TMP/fuera" "$CASA/.claude"
+  else mkdir -p "$CASA/.config"; ln -s "$TMP/fuera" "$CASA/.config/git"; fi
+  antes=$(estado_total; huella "$TMP/fuera")
+  instalar --non-interactive --adopt
+  if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total; huella "$TMP/fuera")" ]; then
+    ok "install_refuses_parent_resolving_outside_home $caso"
+  else ko "install_refuses_parent_resolving_outside_home $caso (rc=$RC)"; cat "$TMP/err" | head; fi
+  rm -rf "$TMP"
+done
+
+# ---------------------------------------------------------------------------
+# install_dry_run_adopt_changes_nothing
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/mia"
+echo "skill propia" > "$CASA/.claude/skills/mia/SKILL.md"
+cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+antes=$(estado_total)
+instalar --dry-run --adopt --non-interactive
+if [ "$RC" -eq 0 ] && [ "$antes" = "$(estado_total)" ] && [ ! -s "$TMP/llamadas.log" ] \
+  && grep -q 'simulacion: adoptar' "$TMP/out"; then
+  ok install_dry_run_adopt_changes_nothing
+else ko "install_dry_run_adopt_changes_nothing (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_handles_spaces_in_paths: HOME y clon con espacios; instala y es idempotente.
+CON_ESPACIOS=1 nuevo_entorno
+instalar --non-interactive
+rc1=$RC
+antes=$(estado_total)
+instalar --non-interactive
+if [ "$rc1" -eq 0 ] && [ "$RC" -eq 0 ] && [ "$antes" = "$(estado_total)" ] \
+  && es_enlace_a "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" \
+  && es_enlace_a "$CASA/.config/git/hooks/pre-push" "$CLON/git-hooks/dispatch" \
+  && node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(JSON.stringify(s).includes(process.argv[2])?0:1)' \
+       "$CASA/.claude/settings.json" "$CASA/"; then
+  ok install_handles_spaces_in_paths
+else ko "install_handles_spaces_in_paths (rc $rc1 $RC)"; cat "$TMP/err" | head; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_rejects_bad_home: HOME relativo o vacio -> 1, sin escribir.
+nuevo_entorno
+for h in "relativo" ""; do
+  ( cd "$TMP" && env HOME="$h" GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 PATH="$TMP/bin:$PATH" \
+      "$TEST_SH" "$CLON/install.sh" --non-interactive </dev/null >/dev/null 2>"$TMP/err" )
+  rc=$?
+  if [ "$rc" -eq 1 ] && [ ! -e "$TMP/relativo" ] && grep -q HOME "$TMP/err"; then ok "install_rejects_bad_home '$h'"
+  else ko "install_rejects_bad_home '$h' (rc=$rc)"; fi
+done
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# Destino que solo difiere en el home literal (BIN= de cbm-code-discovery-gate).
+# con_home_literal <destino>: copia del hook del repo con "$HOME/" -> home real.
+con_home_literal() {
+  mkdir -p "$CASA/.claude/hooks"
+  sed "s|\$HOME/|$CASA/|g" "$CLON/hooks/cbm-code-discovery-gate" > "$1"
+  chmod +x "$1"
+  cmp -s "$1" "$CLON/hooks/cbm-code-discovery-gate" && ko "preparacion: el hook no lleva \$HOME/"
+}
+G=.claude/hooks/cbm-code-discovery-gate
+
+# install_adopt_treats_home_literal_as_equivalent
+nuevo_entorno
+con_home_literal "$CASA/$G"
+cp "$CASA/$G" "$TMP/original"
+repo_antes=$(huella "$CLON")
+instalar --adopt --non-interactive
+r=$(respaldos)
+if [ "$RC" -eq 0 ] && es_enlace_a "$CASA/$G" "$CLON/hooks/cbm-code-discovery-gate" \
+  && cmp -s "$r/$G" "$TMP/original" \
+  && [ "$repo_antes" = "$(huella "$CLON" | grep -v '^F \./machine\.env ')" ]; then
+  ok install_adopt_treats_home_literal_as_equivalent
+else ko "install_adopt_treats_home_literal_as_equivalent (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head; fi
+rm -rf "$TMP"
+
+# install_home_literal_difference_conflicts_without_adopt
+nuevo_entorno
+con_home_literal "$CASA/$G"
+antes=$(estado_total)
+instalar --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'unica diferencia es la ruta del home' "$TMP/out"; then
+  ok install_home_literal_difference_conflicts_without_adopt
+else ko "install_home_literal_difference_conflicts_without_adopt (rc=$RC)"; cat "$TMP/out" | head; fi
+rm -rf "$TMP"
+
+# install_other_difference_still_conflicts_with_adopt
+nuevo_entorno
+con_home_literal "$CASA/$G"
+echo "# linea local de mas" >> "$CASA/$G"
+antes=$(estado_total)
+instalar --adopt --non-interactive
+if [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ] && grep -q 'linea local de mas' "$TMP/out" \
+  && ! grep -q 'unica diferencia' "$TMP/out"; then
+  ok install_other_difference_still_conflicts_with_adopt
+else ko "install_other_difference_still_conflicts_with_adopt (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_adopt_ignores_listed_paths: skills/synced (en adopt-ignore) no se toca.
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/synced/docx"
+echo "cache de la app" > "$CASA/.claude/skills/synced/docx/SKILL.md"
+casa_synced=$(huella "$CASA/.claude/skills/synced")
+repo_antes=$(huella "$CLON")
+instalar --adopt --non-interactive
+if [ "$RC" -eq 0 ] && [ ! -e "$CLON/skills/synced" ] && [ ! -L "$CASA/.claude/skills/synced" ] \
+  && [ "$casa_synced" = "$(huella "$CASA/.claude/skills/synced")" ] && [ -z "$(respaldos)" ] \
+  && grep -qx 'ignorado: skills/synced (adopt-ignore)' "$TMP/out" \
+  && ! grep -q 'skills/synced' "$CASA/.claude/.p4-manifest" \
+  && [ "$repo_antes" = "$(huella "$CLON" | grep -v '^F \./machine\.env ')" ]; then
+  ok install_adopt_ignores_listed_paths
+else ko "install_adopt_ignores_listed_paths (rc=$RC)"; cat "$TMP/out" "$TMP/err" | head; fi
+rm -rf "$TMP"
+
+# install_adopt_ignore_is_literal: skills/synced-extra y skills/synce no estan en la lista.
+nuevo_entorno
+for n in synced-extra synce; do
+  mkdir -p "$CASA/.claude/skills/$n"; echo "$n" > "$CASA/.claude/skills/$n/SKILL.md"
+done
+instalar --adopt --non-interactive
+if [ "$RC" -eq 0 ] && es_enlace_a "$CASA/.claude/skills/synced-extra" "$CLON/skills/synced-extra" \
+  && es_enlace_a "$CASA/.claude/skills/synce" "$CLON/skills/synce" \
+  && [ -f "$CLON/skills/synced-extra/SKILL.md" ] && ! grep -q 'ignorado' "$TMP/out"; then
+  ok install_adopt_ignore_is_literal
+else ko "install_adopt_ignore_is_literal (rc=$RC)"; fi
+rm -rf "$TMP"
+
+# install_adopt_ignore_only_unknown_entries: una ruta listada que el repo SI tiene sigue
+# el camino normal (se enlaza; si el destino es ajeno y distinto, conflicto).
+nuevo_entorno
+echo 'skills/estado' >> "$CLON/adopt-ignore"
+instalar --non-interactive
+r1=$RC; e1=0; es_enlace_a "$CASA/.claude/skills/estado" "$CLON/skills/estado" && e1=1
+rm -rf "$TMP"
+nuevo_entorno
+echo 'skills/estado' >> "$CLON/adopt-ignore"
+mkdir -p "$CASA/.claude/skills/estado"; echo distinto > "$CASA/.claude/skills/estado/SKILL.md"
+instalar --adopt --non-interactive
+if [ "$r1" -eq 0 ] && [ "$e1" -eq 1 ] && [ "$RC" -eq 2 ] && ! grep -q 'ignorado' "$TMP/out"; then
+  ok install_adopt_ignore_only_unknown_entries
+else ko "install_adopt_ignore_only_unknown_entries ($r1 $e1 $RC)"; fi
+rm -rf "$TMP"
+
+# ===========================================================================
+# Modo copia (--copy o P4_COPY=1; Windows): copias en vez de enlaces.
+# enlaces_bajo <dir>: lista los enlaces simbolicos que haya debajo.
+enlaces_bajo() { find "$1" -type l 2>/dev/null; }
+
+# install_copy_mode_creates_copies_not_links
+nuevo_entorno
+instalar --copy --non-interactive
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/err"; }
+[ -z "$(enlaces_bajo "$CASA/.claude"; enlaces_bajo "$CASA/.config")" ] || { bien=0; echo "  hay enlaces:"; enlaces_bajo "$CASA"; }
+cmp -s "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  CLAUDE.md"; }
+for s in "$CLON"/skills/* "$CLON"/hooks/* "$CLON"/themes/*; do
+  rel=${s#"$CLON"/}
+  diff -r "$CASA/.claude/$rel" "$s" >/dev/null 2>&1 || { bien=0; echo "  $rel"; }
+done
+[ -x "$CASA/.claude/hooks/gitflow-guard.sh" ] || { bien=0; echo "  modo del hook"; }
+while IFS= read -r n; do
+  { [ -f "$CASA/.config/git/hooks/$n" ] && cmp -s "$CASA/.config/git/hooks/$n" "$CLON/git-hooks/dispatch" \
+    && [ -x "$CASA/.config/git/hooks/$n" ]; } || { bien=0; echo "  git hook $n"; }
+done < "$CLON/git-hooks/NAMES"
+cmp -s "$CASA/.config/git/hooks/lib.sh" "$CLON/git-hooks/lib.sh" || { bien=0; echo "  lib.sh"; }
+[ "$(GIT_CONFIG_GLOBAL="$TMP/gitconfig" GIT_CONFIG_NOSYSTEM=1 git config --global --get core.hooksPath)" = "$CASA/.config/git/hooks" ] \
+  || { bien=0; echo "  core.hooksPath"; }
+m="$CASA/.claude/.p4-manifest"
+{ grep -qx "copia	$CASA/.claude/CLAUDE.md	$CLON/CLAUDE.md" "$m" \
+  && grep -qx "copia	$CASA/.claude/skills/estado	$CLON/skills/estado" "$m" \
+  && grep -qx "copia	$CASA/.config/git/hooks/pre-push	$CLON/git-hooks/dispatch" "$m" \
+  && ! grep -q '^link	' "$m"; } || { bien=0; echo "  manifiesto"; cat "$m"; }
+[ -f "$CASA/.claude/settings.json" ] || { bien=0; echo "  settings.json"; }
+[ -z "$(respaldos)" ] || { bien=0; echo "  respaldo innecesario"; }
+[ "$bien" -eq 1 ] && ok install_copy_mode_creates_copies_not_links || ko install_copy_mode_creates_copies_not_links
+rm -rf "$TMP"
+
+# install_copy_mode_is_idempotent: P4_COPY=1 (lo que fija el envoltorio .ps1) elige el modo.
+nuevo_entorno
+P4_COPY=1; export P4_COPY
+instalar --non-interactive; rc1=$RC
+antes=$(estado_total)
+instalar --non-interactive; rc2=$RC
+unset P4_COPY
+despues=$(estado_total)
+if [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && [ "$antes" = "$despues" ] && [ -z "$(enlaces_bajo "$CASA")" ] \
+  && [ -z "$(respaldos)" ] && ! grep -q actualizar "$TMP/out"; then
+  ok install_copy_mode_is_idempotent
+else ko "install_copy_mode_is_idempotent (rc $rc1 $rc2)"; printf '%s\n' "$antes" > "$TMP/a"; printf '%s\n' "$despues" | diff "$TMP/a" - | head -20; fi
+rm -rf "$TMP"
+
+# install_copy_mode_updates_changed_repo_file: cambia el repo -> repetir actualiza la copia
+# y guarda la anterior en el respaldo (p4-copias-previas, que uninstall no restaura).
+nuevo_entorno
+instalar --copy --non-interactive; rc1=$RC
+cp "$CASA/.claude/CLAUDE.md" "$TMP/claude-previo"
+echo "# regla nueva" >> "$CLON/CLAUDE.md"
+echo "linea nueva" >> "$CLON/skills/estado/SKILL.md"
+echo "# cambio" >> "$CLON/git-hooks/dispatch"
+instalar --copy --non-interactive; rc2=$RC
+r=$(respaldos)
+bien=1
+[ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] || { bien=0; echo "  rc $rc1 $rc2"; cat "$TMP/err"; }
+cmp -s "$CASA/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  CLAUDE.md sin actualizar"; }
+diff -r "$CASA/.claude/skills/estado" "$CLON/skills/estado" >/dev/null || { bien=0; echo "  skill sin actualizar"; }
+cmp -s "$CASA/.config/git/hooks/pre-push" "$CLON/git-hooks/dispatch" || { bien=0; echo "  git hook sin actualizar"; }
+[ "$(printf '%s\n' "$r" | grep -c .)" -eq 1 ] || { bien=0; echo "  respaldos: $r"; }
+cmp -s "$r/p4-copias-previas/.claude/CLAUDE.md" "$TMP/claude-previo" || { bien=0; echo "  copia previa no respaldada"; ls -R "$r" | head; }
+[ -z "$(enlaces_bajo "$CASA/.claude")" ] || { bien=0; echo "  enlaces"; }
+[ "$(grep -c "^copia	$CASA/.claude/CLAUDE.md	" "$CASA/.claude/.p4-manifest")" -eq 1 ] || { bien=0; echo "  manifiesto duplicado"; }
+[ -z "$(find "$CASA" -name '.p4-tmp.*')" ] || { bien=0; echo "  quedan temporales"; }
+[ "$bien" -eq 1 ] && ok install_copy_mode_updates_changed_repo_file || ko install_copy_mode_updates_changed_repo_file
+rm -rf "$TMP"
+
+# install_copy_mode_refuses_foreign_file: archivo ajeno (sin y con --adopt si difiere del
+# repo), y una copia identica que no esta en el manifiesto: 2 y nada cambia.
+bien=1
+for caso in ajeno adopt-distinto identico; do
+  nuevo_entorno
+  mkdir -p "$CASA/.claude"
+  if [ "$caso" = identico ]; then cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+  else echo "reglas de otra persona" > "$CASA/.claude/CLAUDE.md"; fi
+  antes=$(estado_total)
+  if [ "$caso" = adopt-distinto ]; then instalar --copy --adopt --non-interactive
+  else instalar --copy --non-interactive; fi
+  { [ "$RC" -eq 2 ] && [ "$antes" = "$(estado_total)" ]; } || { bien=0; echo "  $caso rc=$RC"; }
+  [ "$caso" = identico ] || grep -q 'reglas de otra persona' "$TMP/out" "$TMP/err" || { bien=0; echo "  $caso sin diferencia"; }
+  rm -rf "$TMP"
+done
+[ "$bien" -eq 1 ] && ok install_copy_mode_refuses_foreign_file || ko install_copy_mode_refuses_foreign_file
+
+# install_copy_mode_adopt: skill propia (se copia al repo), CLAUDE.md identico, hook con el
+# home literal (gana el repo) y skills/synced (adopt-ignore, no se toca).
+nuevo_entorno
+mkdir -p "$CASA/.claude/skills/mia" "$CASA/.claude/skills/synced/docx"
+echo "skill propia" > "$CASA/.claude/skills/mia/SKILL.md"
+echo "cache" > "$CASA/.claude/skills/synced/docx/SKILL.md"
+cp "$CLON/CLAUDE.md" "$CASA/.claude/CLAUDE.md"
+con_home_literal "$CASA/$G"
+cp "$CASA/$G" "$TMP/hook-original"
+instalar --copy --adopt --non-interactive
+r=$(respaldos)
+m="$CASA/.claude/.p4-manifest"
+bien=1
+[ "$RC" -eq 0 ] || { bien=0; echo "  rc=$RC"; cat "$TMP/out" "$TMP/err" | head; }
+[ -z "$(enlaces_bajo "$CASA")" ] || { bien=0; echo "  hay enlaces"; }
+[ "$(cat "$CLON/skills/mia/SKILL.md" 2>/dev/null)" = "skill propia" ] || { bien=0; echo "  no se copio al repo"; }
+{ [ -d "$CASA/.claude/skills/mia" ] && diff -r "$CASA/.claude/skills/mia" "$CLON/skills/mia" >/dev/null; } || { bien=0; echo "  copia mia"; }
+[ "$(cat "$r/.claude/skills/mia/SKILL.md" 2>/dev/null)" = "skill propia" ] || { bien=0; echo "  respaldo mia"; }
+cmp -s "$r/$G" "$TMP/hook-original" || { bien=0; echo "  respaldo hook"; }
+cmp -s "$CASA/$G" "$CLON/hooks/cbm-code-discovery-gate" || { bien=0; echo "  hook no es la version del repo"; }
+cmp -s "$r/.claude/CLAUDE.md" "$CLON/CLAUDE.md" || { bien=0; echo "  respaldo CLAUDE.md"; }
+grep -q "^adopt	$CLON/skills/mia	" "$m" || { bien=0; echo "  manifiesto adopt"; }
+grep -qx "copia	$CASA/.claude/skills/mia	$CLON/skills/mia" "$m" || { bien=0; echo "  manifiesto copia"; }
+{ [ ! -e "$CLON/skills/synced" ] && [ "$(cat "$CASA/.claude/skills/synced/docx/SKILL.md")" = cache ] \
+  && grep -qx 'ignorado: skills/synced (adopt-ignore)' "$TMP/out"; } || { bien=0; echo "  adopt-ignore"; }
+[ "$bien" -eq 1 ] && ok install_copy_mode_adopt || ko install_copy_mode_adopt
+rm -rf "$TMP"
+
+# install_copy_mode_warns_with_backup_path_when_replacing: copia editada a mano -> al
+# reemplazarla, aviso con la ruta del respaldo donde quedan las ediciones.
+nuevo_entorno
+instalar --copy --non-interactive; rc1=$RC
+echo "mi edicion" >> "$CASA/.claude/CLAUDE.md"
+instalar --copy --non-interactive
+r=$(respaldos)
+p="$r/p4-copias-previas/.claude/CLAUDE.md"
+if [ "$rc1" -eq 0 ] && [ "$RC" -eq 0 ] && grep -q 'mi edicion' "$p" 2>/dev/null \
+  && grep -F "aviso: " "$TMP/err" | grep -qF "$p"; then
+  ok install_copy_mode_warns_with_backup_path_when_replacing
+else ko "install_copy_mode_warns_with_backup_path_when_replacing ($rc1 $RC)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
+# install_copy_mode_refuses_mixing_modes: instalado con enlaces -> --copy sale con 2 (y al reves).
+nuevo_entorno
+instalar --non-interactive
+antes=$(estado_total)
+instalar --copy --non-interactive; r1=$RC
+igual1=0; [ "$antes" = "$(estado_total)" ] && igual1=1
+rm -rf "$TMP"
+nuevo_entorno
+instalar --copy --non-interactive
+antes=$(estado_total)
+instalar --non-interactive; r2=$RC
+igual2=0; [ "$antes" = "$(estado_total)" ] && igual2=1
+if [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] && [ "$igual1" -eq 1 ] && [ "$igual2" -eq 1 ] && grep -q 'uninstall' "$TMP/err"; then
+  ok install_copy_mode_refuses_mixing_modes
+else ko "install_copy_mode_refuses_mixing_modes ($r1 $r2 $igual1 $igual2)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
+# ---------------------------------------------------------------------------
+# install_refuses_manifest_from_another_clone: el manifiesto es del clon A; instalar desde B
+# sale con 2, no escribe nada y explica el procedimiento.
+nuevo_entorno
+instalar --non-interactive; r0=$RC
+CLON_A=$CLON; CLON_B="$TMP/clon2/claude-code"
+mkdir -p "$TMP/clon2"; cp -R "$ROOT" "$CLON_B"; rm -f "$CLON_B/machine.env"
+antes=$(huella "$CASA"; cat "$TMP/gitconfig"); antes_b=$(huella "$CLON_B")
+CLON=$CLON_B; instalar --non-interactive; r1=$RC; instalar --adopt --non-interactive; r2=$RC; CLON=$CLON_A
+if [ "$r0" -eq 0 ] && [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] \
+  && [ "$antes" = "$(huella "$CASA"; cat "$TMP/gitconfig")" ] && [ "$antes_b" = "$(huella "$CLON_B")" ] \
+  && grep -q 'otro clon' "$TMP/err" && grep -q 'uninstall.sh' "$TMP/err" && grep -q 'machine.env' "$TMP/err"; then
+  ok install_refuses_manifest_from_another_clone
+else ko "install_refuses_manifest_from_another_clone ($r0 $r1 $r2)"; cat "$TMP/err"; fi
+rm -rf "$TMP"
+
+exit $FAIL

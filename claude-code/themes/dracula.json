@@ -1,0 +1,25 @@
+{
+  "name": "Dracula",
+  "base": "dark",
+  "overrides": {
+    "claude": "#bd93f9",
+    "claudeShimmer": "#ff79c6",
+    "text": "#f8f8f2",
+    "inactive": "#6272a4",
+    "inactiveShimmer": "#8be9fd",
+    "subtle": "#6272a4",
+    "suggestion": "#ff79c6",
+    "permission": "#bd93f9",
+    "permissionShimmer": "#ff79c6",
+    "remember": "#8be9fd",
+    "success": "#50fa7b",
+    "error": "#ff5555",
+    "warning": "#ffb86c",
+    "promptBorder": "#6272a4",
+    "planMode": "#8be9fd",
+    "autoAccept": "#ff79c6",
+    "diffAdded": "#1e3a2a",
+    "diffRemoved": "#3d1f2a",
+    "selectionBg": "#44475a"
+  }
+}
