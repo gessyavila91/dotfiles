@@ -109,6 +109,18 @@ if [ "$rc" -eq 0 ] && grep -qi 'claude' "$TMP/err" && [ ! -s "$FAKE_LOG" ]; then
 else ko "mcp_register_without_cli_warns (rc=$rc)"; fi
 rm -rf "$TMP"
 
+# mcp_register_cli_does_not_consume_stdin (claude falso que lee todo stdin)
+nuevo_entorno
+sed 's#^echo "\$\*" >> "\$FAKE_LOG"#&; cat >/dev/null#' "$TMP/bin/claude" > "$TMP/bin/c2" && mv "$TMP/bin/c2" "$TMP/bin/claude" && chmod +x "$TMP/bin/claude"
+printf 'IDE_MCP=yes\nPHPSTORM_URL=http://127.0.0.1:1/stream\nPYCHARM_URL=http://127.0.0.1:2/stream\n' > "$TMP/m.env"
+grep -q 'cat >/dev/null' "$TMP/bin/claude" || ko "preparacion de cli_does_not_consume_stdin"
+# MCP_REGISTER_DIR se define despues de cargar el archivo.
+(unset MCP_REGISTER_DIR; HOME="$TMP/casa" PATH="$TMP/bin:$PATH" sh -c '. "$1"; MCP_REGISTER_DIR="$4"; mcp_register "$2" "$3" macos' sh \
+  "$ROOT/lib/mcp-register.sh" "$ROOT/mcp.json" "$TMP/m.env" "$ROOT/lib" >/dev/null 2>&1)
+if [ "$(llamadas_add)" -eq 4 ]; then ok mcp_register_cli_does_not_consume_stdin
+else ko "mcp_register_cli_does_not_consume_stdin ($(llamadas_add) de 4)"; fi
+rm -rf "$TMP"
+
 # mcp_json_has_no_credentials
 if node -e '
   const l = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
