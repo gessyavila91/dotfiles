@@ -62,3 +62,9 @@ No tiene `node_modules`. `settings.json` lo invoca con la ruta absoluta de `hook
 - `settings.json` contiene rutas absolutas del directorio personal en los hooks de ccdeck: hay que parametrizarlas.
 - Nada de lo externo se versiona; solo lo propio: skills `desatendido` y `estado`, hooks `estado-*` y `gitflow-guard*`, y `git/hooks`.
 - `agent-dag/` contiene un token de ejecución: debe quedar fuera del repositorio.
+
+## Plantillas de settings (tarea 3)
+
+- `settings.base.json` sale del `settings.json` de la Mac con el directorio personal cambiado por `{{HOME}}`. Las capas `settings.macos.json`, `settings.linux.json` y `settings.windows.json` quedan en `{}`: los comandos de los hooks son iguales en todos los sistemas por ahora.
+- Valores propios de esta Mac que siguen en la base y hay que revisar: la ruta `/usr/local/bin/node` y `/usr/bin/notifyutil` en los hooks, y la frase de `autoMode.environment` con el directorio de trabajo de confianza (ahora con `{{HOME}}`). Las listas se reemplazan enteras entre capas, por eso no se pueden separar sin duplicar el bloque `hooks`.
+- Windows: el prefijo para invocar los scripts de los hooks sería `bash` de Git Bash; se confirma en la tarea 9.
