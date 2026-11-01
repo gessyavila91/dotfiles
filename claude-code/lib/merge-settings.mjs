@@ -10,6 +10,14 @@ import { join, dirname, basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SISTEMAS = ['macos', 'linux', 'windows'];
+// Variables de plantilla por sistema, ademas de {{HOME}} (que viene de --home).
+// Unico lugar donde se definen. {{NODE}}: en macOS la ruta absoluta que usa el
+// settings.json real; en linux/windows se resuelve por PATH.
+export const VARS_SISTEMA = {
+  macos: { NODE: '/usr/local/bin/node' },
+  linux: { NODE: 'node' },
+  windows: { NODE: 'node' },
+};
 const CLAVES_MAQUINA = { IDE_MCP: ['yes', 'no'] };
 // Claves opcionales: las lee mcp-register (URL de cada IDE); aqui solo se validan.
 const OPCIONALES_MAQUINA = ['PHPSTORM_URL', 'PYCHARM_URL'];
@@ -41,11 +49,29 @@ export function mergeSettings(base, osLayer, machine) {
 // sobre el objeto, no sobre el texto JSON, asi JSON.stringify escapa despues
 // barras invertidas y comillas del valor.
 export function render(value, vars) {
-  const sub = (s) => s.replaceAll('{{HOME}}', () => vars.HOME);
+  const sub = (s) =>
+    Object.entries(vars).reduce((acc, [k, v]) => acc.replaceAll(`{{${k}}}`, () => v), s);
   if (typeof value === 'string') return sub(value);
   if (Array.isArray(value)) return value.map((x) => render(x, vars));
   if (esObjeto(value)) {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [sub(k), render(v, vars)]));
+  }
+  return value;
+}
+
+// Elementos de listas con marca `__os: [sistemas]`: se descartan si el sistema
+// no esta en la lista. La marca se elimina siempre del resultado (no confundir
+// con `__agent-dag`, que se conserva). No muta la entrada.
+export function filtrarOs(value, os) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((x) => !(esObjeto(x) && Array.isArray(x.__os) && !x.__os.includes(os)))
+      .map((x) => filtrarOs(x, os));
+  }
+  if (esObjeto(value)) {
+    return Object.fromEntries(
+      Object.entries(value).filter(([k]) => k !== '__os').map(([k, v]) => [k, filtrarOs(v, os)]),
+    );
   }
   return value;
 }
@@ -123,7 +149,7 @@ function main() {
   parseMachineEnv(texto); // valida; IDE_MCP no entra en settings.json
   const base = leerJson(join(a.dir, 'settings.base.json'));
   const capaOs = leerJson(join(a.dir, `settings.${a.os}.json`));
-  const final = render(mergeSettings(base, capaOs, {}), { HOME: a.home });
+  const final = render(filtrarOs(mergeSettings(base, capaOs, {}), a.os), { HOME: a.home, ...VARS_SISTEMA[a.os] });
   escribirAtomico(a.out, JSON.stringify(final, null, 2) + '\n');
 }
 

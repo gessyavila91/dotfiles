@@ -22,6 +22,9 @@
             "type": "command",
             "command": "/usr/bin/notifyutil -p dev.teebe.agent"
           }
+        ],
+        "__os": [
+          "macos"
         ]
       },
       {
@@ -29,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -65,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -118,7 +121,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -141,7 +144,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -217,7 +220,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -241,6 +244,9 @@
             "type": "command",
             "command": "/usr/bin/notifyutil -p dev.teebe.agent"
           }
+        ],
+        "__os": [
+          "macos"
         ]
       },
       {
@@ -248,7 +254,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -280,7 +286,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -304,6 +310,9 @@
             "type": "command",
             "command": "/usr/bin/notifyutil -p dev.teebe.agent"
           }
+        ],
+        "__os": [
+          "macos"
         ]
       },
       {
@@ -311,7 +320,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -323,7 +332,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -335,7 +344,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -347,7 +356,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]
@@ -359,7 +368,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '/usr/local/bin/node' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
+            "command": "/bin/sh -c 'n=$1; shift; [ -x \"$n\" ] || n=$(command -v node) || exit 0; exec \"$n\" \"$@\"' ccdeck-hook '{{NODE}}' '{{HOME}}/.claude/agent-dag/hook.js' --provider 'claude'",
             "timeout": 3
           }
         ]

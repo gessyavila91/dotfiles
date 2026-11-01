@@ -66,5 +66,12 @@ No tiene `node_modules`. `settings.json` lo invoca con la ruta absoluta de `hook
 ## Plantillas de settings (tarea 3)
 
 - `settings.base.json` sale del `settings.json` de la Mac con el directorio personal cambiado por `{{HOME}}`. Las capas `settings.macos.json`, `settings.linux.json` y `settings.windows.json` quedan en `{}`: los comandos de los hooks son iguales en todos los sistemas por ahora.
-- Valores propios de esta Mac que siguen en la base y hay que revisar: la ruta `/usr/local/bin/node` y `/usr/bin/notifyutil` en los hooks, y la frase de `autoMode.environment` con el directorio de trabajo de confianza (ahora con `{{HOME}}`). Las listas se reemplazan enteras entre capas, por eso no se pueden separar sin duplicar el bloque `hooks`.
+- Los comandos propios de macOS ya no están en común: `notifyutil` va con la marca `__os` y la ruta de node con `{{NODE}}` (ver la sección de Windows más abajo). Sigue siendo texto propio de esta Mac la frase de `autoMode.environment` con el directorio de trabajo de confianza.
 - Windows: el prefijo para invocar los scripts de los hooks sería `bash` de Git Bash; se confirma en la tarea 9.
+
+## Windows: hooks de settings (parte 9a)
+
+Claude Code ejecuta los hooks con Git Bash, así que `~` y los scripts `.sh` valen sin cambios. Las entradas con `notifyutil` llevan `__os: ["macos"]` y no se generan en linux ni windows; `{{NODE}}` pasa a `node` (por PATH).
+
+Se asumen funcionales en Windows: `gitflow-guard.sh`, `estado-guard.sh`, `estado-session.sh`, `cbm-*` y el hook `agent-dag` (con Node instalado y ccdeck).
+Por comprobar en la laptop: `peon-ping/peon.sh` (peon-ping tiene instalador propio para Windows) y que `node` esté en el PATH de Git Bash.
